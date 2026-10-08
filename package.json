@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A CLI interface to scaffold your favourite architecture, databases, auth, tools in one single command/prompt.",
   "main": "./dist/cli.js",
-  "bin" :{
+  "bin": {
     "craft": "./dist/cli.js"
   },
   "scripts": {
@@ -28,6 +28,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@inquirer/prompts": "^8.7.3",
     "commander": "^15.0.0"
   }
 }

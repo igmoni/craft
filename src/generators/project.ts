@@ -58,7 +58,7 @@ export const generateProject = async ({
    
 Project: ${projectName}
 Framework: ${framework}
-TypeScript: ${typeScript}
+typeScript: ${typeScript}
 Database: ${database}
 Auth: ${auth}
 Tools: ${tools.join(", ") || "none"}

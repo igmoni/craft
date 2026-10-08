@@ -12,3 +12,5 @@ export interface generateProjectType {
   auth: boolean;
   tools: ToolType[];
 }
+
+export type configType = Partial<generateProjectType>;
