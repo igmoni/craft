@@ -7,6 +7,13 @@ export const registerInitCommand = (program: Command) => {
     .description("Initalizes project")
     .action((projectName) => {
       console.log(`Initalizing project ${projectName}`);
-      generateProject()
+      generateProject({
+        projectName,
+        framework: "next",
+        typeScript: true,
+        database: "none",
+        auth: false,
+        tools: [],
+      });
     });
 };

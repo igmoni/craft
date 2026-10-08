@@ -6,7 +6,14 @@ export const registerInitCommand = (program) => {
         .description("Initalizes project")
         .action((projectName) => {
         console.log(`Initalizing project ${projectName}`);
-        generateProject();
+        generateProject({
+            projectName,
+            framework: "next",
+            typeScript: true,
+            database: "none",
+            auth: false,
+            tools: [],
+        });
     });
 };
 //# sourceMappingURL=init.js.map
