@@ -1,7 +1,7 @@
-export type FrameworkType = "next" | "vite" | "express" | "angular";
+export type FrameworkType = "next" | "vite" | "express";
 export type DatabaseType = "postgres" | "mongodb" | "none";
 export type ToolType = "eslint" | "prettier" | "husky" | "commitlint";
-export interface generateProjectType {
+export interface GenerateProjectConfig {
     projectName: string;
     framework: FrameworkType;
     typeScript: boolean;
@@ -9,4 +9,4 @@ export interface generateProjectType {
     auth: boolean;
     tools: ToolType[];
 }
-export type configType = Partial<generateProjectType>;
+export type PartialProjectConfig = Partial<GenerateProjectConfig>;

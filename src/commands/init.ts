@@ -2,7 +2,7 @@ import { Command, Option } from "commander";
 
 import { generateProject } from "../generators/project.js";
 import { promptProjectConfig } from "../prompts/project.js";
-import type { configType, ToolType } from "../types/utils.js";
+import type { PartialProjectConfig, ToolType } from "../types/utils.js";
 
 const supportedTools: ToolType[] = [
   "eslint",
@@ -28,12 +28,12 @@ const parseTools = (value: string): ToolType[] => {
   return tools as ToolType[];
 };
 
-const getProvidedOptions = (command: Command): configType => {
+const getProvidedOptions = (command: Command): PartialProjectConfig => {
   const options = command.opts();
-  const config: configType = {};
+  const config: PartialProjectConfig = {};
 
   if (command.getOptionValueSource("framework") === "cli") {
-    config.framework = options.framework as configType["framework"];
+    config.framework = options.framework as PartialProjectConfig["framework"];
   }
 
   if (command.getOptionValueSource("typeScript") === "cli") {
@@ -41,7 +41,7 @@ const getProvidedOptions = (command: Command): configType => {
   }
 
   if (command.getOptionValueSource("database") === "cli") {
-    config.database = options.database as configType["database"];
+    config.database = options.database as PartialProjectConfig["database"];
   }
 
   if (command.getOptionValueSource("auth") === "cli") {

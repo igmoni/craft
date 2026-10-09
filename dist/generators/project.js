@@ -23,6 +23,7 @@ export const generateProject = async ({ projectName, framework, typeScript, data
     await fs.mkdir(projectPath, {
         recursive: true,
     });
+    const entries = await fs.readdir(projectPath);
     const readmePath = path.join(projectPath, "README.md");
     try {
         await fs.access(readmePath);

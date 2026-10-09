@@ -3,7 +3,7 @@ import fs from "fs/promises";
 
 import { isNodeError } from "../utils/common.js";
 
-import type { generateProjectType } from "../types/utils.js";
+import type { GenerateProjectConfig } from "../types/utils.js";
 
 export const generateProject = async ({
   projectName,
@@ -12,7 +12,7 @@ export const generateProject = async ({
   database,
   auth,
   tools,
-}: generateProjectType) => {
+}: GenerateProjectConfig) => {
   console.log("Generating project");
 
   const isCurrentDirectory = projectName === ".";
@@ -38,6 +38,8 @@ export const generateProject = async ({
   await fs.mkdir(projectPath, {
     recursive: true,
   });
+
+  const entries = await fs.readdir(projectPath);
 
   const readmePath = path.join(projectPath, "README.md");
 
