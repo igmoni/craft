@@ -90,15 +90,25 @@ export const registerInitCommand = (program: Command) => {
       options: Record<string, unknown>,
       command: Command,
     ): Promise<void> => {
-      const providedConfig = getProvidedOptions(command);
+      try {
+        const providedConfig = getProvidedOptions(command);
 
-      if (projectName) {
-        providedConfig.projectName = projectName;
+        if (projectName) {
+          providedConfig.projectName = projectName;
+        }
+
+        const config = await promptProjectConfig(providedConfig);
+
+        await generateProject(config);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred.";
+
+        console.error(`\nError: ${message}`);
+        process.exitCode = 1;
       }
-
-      const config = await promptProjectConfig(providedConfig);
-
-      await generateProject(config);
     },
   );
 };

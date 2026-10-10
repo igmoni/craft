@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs/promises";
-import { isNodeError } from "../utils/common.js";
+import { confirm } from "@inquirer/prompts";
+import { isNodeError, pathExists } from "../utils/common.js";
 export const generateProject = async ({ projectName, framework, typeScript, database, auth, tools, }) => {
     console.log("Generating project");
     const isCurrentDirectory = projectName === ".";
@@ -8,44 +9,44 @@ export const generateProject = async ({ projectName, framework, typeScript, data
     const actualProjectName = isCurrentDirectory
         ? path.basename(projectPath)
         : projectName;
-    if (!isCurrentDirectory) {
-        try {
-            await fs.access(projectPath);
-            throw new Error(`Project "${projectName}" already exists!`);
-        }
-        catch (error) {
-            if (!isNodeError(error) || error.code !== "ENOENT") {
-                // Target doesn't exist, so we'll create it below.
-                throw error;
-            }
-        }
+    // Phase 1: Inspect the target without modifying it.
+    const targetExists = await pathExists(projectPath);
+    if (targetExists && !isCurrentDirectory) {
+        throw new Error(`Project "${projectName}" already exists!`);
     }
-    await fs.mkdir(projectPath, {
-        recursive: true,
-    });
-    const entries = await fs.readdir(projectPath);
+    const entries = targetExists ? await fs.readdir(projectPath) : [];
     const readmePath = path.join(projectPath, "README.md");
-    try {
-        await fs.access(readmePath);
-        throw new Error(`README.md already exists in "${actualProjectName}".`);
+    // Phase 2: Detect conflicts before asking to proceed.
+    if (await pathExists(readmePath)) {
+        throw new Error(`Cannot generate project: README.md already exists in "${actualProjectName}".`);
     }
-    catch (error) {
-        if (!isNodeError(error) || error.code !== "ENOENT") {
-            throw error;
+    // Phase 3: Ask permission when using a non-empty current directory.
+    if (isCurrentDirectory && entries.length > 0) {
+        const shouldContinue = await confirm({
+            message: "This directory contains existing files. Continue without overwriting them?",
+            default: false,
+        });
+        if (!shouldContinue) {
+            console.log("Project generation cancelled.");
+            return;
         }
     }
-    await fs.writeFile(path.join(readmePath), `# ${actualProjectName}\n`);
+    // Phase 4: Begin writing only after preflight checks pass.
+    await fs.mkdir(projectPath, { recursive: true });
+    await fs.writeFile(readmePath, `# ${actualProjectName}\n`, {
+        flag: "wx",
+    });
     console.log(`
     Project created successfully!
-   
-Project: ${projectName}
-Framework: ${framework}
-typeScript: ${typeScript}
-Database: ${database}
-Auth: ${auth}
-Tools: ${tools.join(", ") || "none"}
 
-Location: ${projectPath}
-    `);
+    Project: ${projectName}
+    Framework: ${framework}
+    TypeScript: ${typeScript}
+    Database: ${database}
+    Auth: ${auth}
+    Tools: ${tools.join(", ") || "none"}
+
+    Location: ${projectPath}
+  `);
 };
 //# sourceMappingURL=project.js.map

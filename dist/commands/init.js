@@ -52,12 +52,21 @@ export const registerInitCommand = (program) => {
     init.addOption(new Option("--auth", "Include authentication").default(false));
     init.addOption(new Option("--tools <tools>", "Choose development tools").argParser(parseTools));
     init.action(async (projectName, options, command) => {
-        const providedConfig = getProvidedOptions(command);
-        if (projectName) {
-            providedConfig.projectName = projectName;
+        try {
+            const providedConfig = getProvidedOptions(command);
+            if (projectName) {
+                providedConfig.projectName = projectName;
+            }
+            const config = await promptProjectConfig(providedConfig);
+            await generateProject(config);
         }
-        const config = await promptProjectConfig(providedConfig);
-        await generateProject(config);
+        catch (error) {
+            const message = error instanceof Error
+                ? error.message
+                : "An unexpected error occurred.";
+            console.error(`\nError: ${message}`);
+            process.exitCode = 1;
+        }
     });
 };
 //# sourceMappingURL=init.js.map
