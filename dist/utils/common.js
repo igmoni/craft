@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 export function isNodeError(error) {
-    return error instanceof Error;
+    return error instanceof Error && "code" in error;
 }
 export async function pathExists(targetPath) {
     try {

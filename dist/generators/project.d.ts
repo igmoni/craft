@@ -1,2 +1,2 @@
 import type { GenerateProjectConfig } from "../types/utils.js";
-export declare const generateProject: ({ projectName, framework, typeScript, database, auth, tools, }: GenerateProjectConfig) => Promise<void>;
+export declare const generateProject: (config: GenerateProjectConfig) => Promise<void>;

@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 
 export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error;
+  return error instanceof Error && "code" in error;
 }
 
 export async function pathExists(targetPath: string): Promise<boolean> {

@@ -1,0 +1,1 @@
+{"version":3,"file":"runCommand.js","sourceRoot":"","sources":["../../src/services/runCommand.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,KAAK,EAAE,MAAM,OAAO,CAAC;AAE9B,MAAM,CAAC,KAAK,UAAU,UAAU,CAC9B,OAAe,EACf,IAAc,EACd,GAAW;IAEX,MAAM,KAAK,CAAC,OAAO,EAAE,IAAI,EAAE;QACzB,GAAG;QACH,KAAK,EAAE,SAAS;QAChB,WAAW,EAAE,IAAI;KAClB,CAAC,CAAC;AACL,CAAC"}

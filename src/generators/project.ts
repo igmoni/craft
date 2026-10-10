@@ -1,48 +1,49 @@
-import path from "path";
-import fs from "fs/promises";
-
+import path from "node:path";
+import fs from "node:fs/promises";
 import { confirm } from "@inquirer/prompts";
 
-import { isNodeError, pathExists } from "../utils/common.js";
+import { pathExists } from "../utils/common.js";
+import { runCommand } from "../services/runCommand.js";
+import {
+  createStagingDirectory,
+  mergeStagedFiles,
+} from "../services/staging.js";
+
+import { generateNextProject } from "./frameworks/next.js";
+import { generateViteProject } from "./frameworks/vite.js";
+import { generateExpressProject } from "./frameworks/express.js";
 
 import type { GenerateProjectConfig } from "../types/utils.js";
 
-export const generateProject = async ({
-  projectName,
-  framework,
-  typeScript,
-  database,
-  auth,
-  tools,
-}: GenerateProjectConfig): Promise<void> => {
-  console.log("Generating project");
+import { configureTools } from "./tools.js";
+
+export const generateProject = async (
+  config: GenerateProjectConfig,
+): Promise<void> => {
+  const { projectName, framework } = config;
 
   const isCurrentDirectory = projectName === ".";
-  const projectPath = path.resolve(projectName);
+  const targetDir = path.resolve(projectName);
+  const actualProjectName = path.basename(targetDir);
 
-  const actualProjectName = isCurrentDirectory
-    ? path.basename(projectPath)
-    : projectName;
+  console.log("Preparing project generation...");
 
-  // Phase 1: Inspect the target without modifying it.
-  const targetExists = await pathExists(projectPath);
+  const targetExists = await pathExists(targetDir);
 
   if (targetExists && !isCurrentDirectory) {
-    throw new Error(`Project "${projectName}" already exists!`);
+    throw new Error(`Project "${projectName}" already exists.`);
   }
 
-  const entries = targetExists ? await fs.readdir(projectPath) : [];
+  if (targetExists) {
+    const stat = await fs.lstat(targetDir);
 
-  const readmePath = path.join(projectPath, "README.md");
-
-  // Phase 2: Detect conflicts before asking to proceed.
-  if (await pathExists(readmePath)) {
-    throw new Error(
-      `Cannot generate project: README.md already exists in "${actualProjectName}".`,
-    );
+    if (!stat.isDirectory() || stat.isSymbolicLink()) {
+      throw new Error(`Target is not a safe directory: ${targetDir}`);
+    }
   }
 
-  // Phase 3: Ask permission when using a non-empty current directory.
+  const entries = targetExists ? await fs.readdir(targetDir) : [];
+
   if (isCurrentDirectory && entries.length > 0) {
     const shouldContinue = await confirm({
       message:
@@ -56,23 +57,54 @@ export const generateProject = async ({
     }
   }
 
-  // Phase 4: Begin writing only after preflight checks pass.
-  await fs.mkdir(projectPath, { recursive: true });
+  const stagingRoot = await createStagingDirectory();
+  const stagingProjectDir = path.join(stagingRoot, actualProjectName);
 
-  await fs.writeFile(readmePath, `# ${actualProjectName}\n`, {
-    flag: "wx",
-  });
+  try {
+    switch (framework) {
+      case "next":
+        await generateNextProject(config, stagingProjectDir);
+        break;
 
-  console.log(`
-    Project created successfully!
+      case "vite":
+        await generateViteProject(config, stagingProjectDir);
+        break;
 
-    Project: ${projectName}
-    Framework: ${framework}
-    TypeScript: ${typeScript}
-    Database: ${database}
-    Auth: ${auth}
-    Tools: ${tools.join(", ") || "none"}
+      case "express":
+        await generateExpressProject(config, stagingProjectDir);
+        break;
 
-    Location: ${projectPath}
-  `);
+      default: {
+        const unsupported: never = framework;
+        throw new Error(`Unsupported framework: ${unsupported}`);
+      }
+    }
+    console.log("Configuring selected tools...");
+await configureTools(config, stagingProjectDir);
+
+    await mergeStagedFiles(stagingProjectDir, targetDir);
+
+    console.log("Installing project dependencies...");
+    await runCommand("npm", ["install"], targetDir);
+
+    console.log(`
+Project created successfully!
+
+Project: ${projectName}
+Framework: ${framework}
+Location: ${targetDir}
+`);
+  } catch (error: unknown) {
+    throw new Error(
+      `Failed to generate ${framework} project: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
+      { cause: error },
+    );
+  } finally {
+    await fs.rm(stagingRoot, {
+      recursive: true,
+      force: true,
+    });
+  }
 };
