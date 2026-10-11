@@ -13,6 +13,8 @@ import { generateNextProject } from "./frameworks/next.js";
 import { generateViteProject } from "./frameworks/vite.js";
 import { generateExpressProject } from "./frameworks/express.js";
 
+import { configureDatabase } from "./database.js";
+
 import type { GenerateProjectConfig } from "../types/utils.js";
 
 import { configureTools } from "./tools.js";
@@ -79,8 +81,12 @@ export const generateProject = async (
         throw new Error(`Unsupported framework: ${unsupported}`);
       }
     }
+
+    console.log("Configuring database...");
+    await configureDatabase(config, stagingProjectDir);
+
     console.log("Configuring selected tools...");
-await configureTools(config, stagingProjectDir);
+    await configureTools(config, stagingProjectDir);
 
     await mergeStagedFiles(stagingProjectDir, targetDir);
 

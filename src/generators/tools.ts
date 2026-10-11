@@ -149,10 +149,10 @@ async function configurePrettier(
 
   if (!(await exists(ignoreFile))) {
     await fs.writeFile(
-      ignoreFile,
-      "node_modules\ndist\nbuild\n.next\ncoverage\n",
-      { flag: "wx" },
-    );
+        ignoreFile,
+        "node_modules\ndist\nbuild\n.next\ncoverage\ntsconfig.json\n",
+        { flag: "wx" },
+      );
   }
 }
 

@@ -87,7 +87,7 @@ async function configurePrettier(projectDir, packageJson) {
     }
     const ignoreFile = path.join(projectDir, ".prettierignore");
     if (!(await exists(ignoreFile))) {
-        await fs.writeFile(ignoreFile, "node_modules\ndist\nbuild\n.next\ncoverage\n", { flag: "wx" });
+        await fs.writeFile(ignoreFile, "node_modules\ndist\nbuild\n.next\ncoverage\ntsconfig.json\n", { flag: "wx" });
     }
 }
 async function configureHusky(projectDir, packageJson, useCommitlint) {

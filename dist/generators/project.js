@@ -7,6 +7,7 @@ import { createStagingDirectory, mergeStagedFiles, } from "../services/staging.j
 import { generateNextProject } from "./frameworks/next.js";
 import { generateViteProject } from "./frameworks/vite.js";
 import { generateExpressProject } from "./frameworks/express.js";
+import { configureDatabase } from "./database.js";
 import { configureTools } from "./tools.js";
 export const generateProject = async (config) => {
     const { projectName, framework } = config;
@@ -53,6 +54,8 @@ export const generateProject = async (config) => {
                 throw new Error(`Unsupported framework: ${unsupported}`);
             }
         }
+        console.log("Configuring database...");
+        await configureDatabase(config, stagingProjectDir);
         console.log("Configuring selected tools...");
         await configureTools(config, stagingProjectDir);
         await mergeStagedFiles(stagingProjectDir, targetDir);
