@@ -1,5 +1,5 @@
 {
-  "name": "craft",
+  "name": "@igmoni/craft",
   "version": "1.0.0",
   "description": "A CLI interface to scaffold your favourite architecture, databases, auth, tools in one single command/prompt.",
   "main": "./dist/cli.js",
@@ -35,5 +35,10 @@
     "@inquirer/prompts": "^8.7.3",
     "commander": "^15.0.0",
     "execa": "^10.1.0"
-  }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
 }
