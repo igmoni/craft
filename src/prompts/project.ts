@@ -2,6 +2,7 @@ import { input, select, confirm, checkbox } from "@inquirer/prompts";
 import type {
   PartialProjectConfig,
   GenerateProjectConfig,
+  AuthOption,
 } from "../types/utils.js";
 
 export const promptProjectConfig = async (
@@ -77,12 +78,26 @@ export const promptProjectConfig = async (
       ],
     }));
 
-  const auth =
+  const authChoice =
     existing.auth ??
     (await confirm({
       message: "Add authentication?",
       default: false,
     }));
+
+  const auth: AuthOption =
+    authChoice === false
+      ? false
+      : typeof authChoice === "string"
+        ? authChoice
+        : await select({
+            message: "Choose an authentication provider",
+            choices: [
+              { name: "Better Auth", value: "better-auth" },
+              { name: "Auth.js (Next.js only)", value: "authjs" },
+              { name: "Clerk", value: "clerk" },
+            ],
+          });
 
   const tools =
     existing.tools ??

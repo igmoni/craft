@@ -7,14 +7,16 @@ export async function generateNextProject(
   targetDir: string,
 ): Promise<void> {
   const args = [
-    "--yes",
     "create-next-app@latest",
     targetDir,
+    "--yes",
     config.typeScript ? "--ts" : "--js",
     "--use-npm",
     "--skip-install",
-    "--app",
+    "--src-dir",
+    '--app',
     "--disable-git",
+    "--tailwind"
   ];
 
   if (config.tools.includes("eslint")) {

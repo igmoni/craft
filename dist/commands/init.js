@@ -49,7 +49,9 @@ export const registerInitCommand = (program) => {
     init.addOption(new Option("-d, --database <database>", "Choose a database")
         .choices(["postgres", "mongodb", "none"])
         .default("none"));
-    init.addOption(new Option("--auth", "Include authentication").default(false));
+    init.addOption(new Option("--auth [provider]", "Configure an authentication provider")
+        .choices(["better-auth", "authjs", "clerk"])
+        .default(false));
     init.addOption(new Option("--tools <tools>", "Choose development tools").argParser(parseTools));
     init.action(async (projectName, options, command) => {
         try {

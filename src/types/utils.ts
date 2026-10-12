@@ -4,14 +4,18 @@ export type DatabaseType = "postgres" | "mongodb" | "none";
 
 export type ToolType = "eslint" | "prettier" | "husky" | "commitlint";
 
-export type PackageManager = "npm" | "bun" | "pnpm" | "yarn"
+export type PackageManager = "npm" | "bun" | "pnpm" | "yarn";
+
+export type AuthProvider = "better-auth" | "authjs" | "clerk";
+
+export type AuthOption = AuthProvider | false;
 
 export interface GenerateProjectConfig {
   projectName: string;
   framework: FrameworkType;
   typeScript: boolean;
   database: DatabaseType;
-  auth: boolean;
+  auth: AuthOption;
   tools: ToolType[];
 }
 

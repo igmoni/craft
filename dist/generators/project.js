@@ -7,6 +7,8 @@ import { createStagingDirectory, mergeStagedFiles, } from "../services/staging.j
 import { generateNextProject } from "./frameworks/next.js";
 import { generateViteProject } from "./frameworks/vite.js";
 import { generateExpressProject } from "./frameworks/express.js";
+import { configureAuth } from "./auth.js";
+import { configureTailwind } from "./tailwind.js";
 import { configureDatabase } from "./database.js";
 import { configureTools } from "./tools.js";
 export const generateProject = async (config) => {
@@ -54,8 +56,12 @@ export const generateProject = async (config) => {
                 throw new Error(`Unsupported framework: ${unsupported}`);
             }
         }
+        console.log("Configuring Tailwind...");
+        await configureTailwind(config, stagingProjectDir);
         console.log("Configuring database...");
         await configureDatabase(config, stagingProjectDir);
+        console.log("Configuring authentication...");
+        await configureAuth(config, stagingProjectDir);
         console.log("Configuring selected tools...");
         await configureTools(config, stagingProjectDir);
         await mergeStagedFiles(stagingProjectDir, targetDir);

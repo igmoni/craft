@@ -13,6 +13,8 @@ import { generateNextProject } from "./frameworks/next.js";
 import { generateViteProject } from "./frameworks/vite.js";
 import { generateExpressProject } from "./frameworks/express.js";
 
+import { configureAuth } from "./auth.js";
+import { configureTailwind } from "./tailwind.js";
 import { configureDatabase } from "./database.js";
 
 import type { GenerateProjectConfig } from "../types/utils.js";
@@ -81,9 +83,14 @@ export const generateProject = async (
         throw new Error(`Unsupported framework: ${unsupported}`);
       }
     }
+    console.log("Configuring Tailwind...");
+    await configureTailwind(config, stagingProjectDir);
 
     console.log("Configuring database...");
     await configureDatabase(config, stagingProjectDir);
+
+    console.log("Configuring authentication...");
+    await configureAuth(config, stagingProjectDir);
 
     console.log("Configuring selected tools...");
     await configureTools(config, stagingProjectDir);

@@ -57,11 +57,23 @@ export const promptProjectConfig = async (existing = {}) => {
                 },
             ],
         }));
-    const auth = existing.auth ??
+    const authChoice = existing.auth ??
         (await confirm({
             message: "Add authentication?",
             default: false,
         }));
+    const auth = authChoice === false
+        ? false
+        : typeof authChoice === "string"
+            ? authChoice
+            : await select({
+                message: "Choose an authentication provider",
+                choices: [
+                    { name: "Better Auth", value: "better-auth" },
+                    { name: "Auth.js (Next.js only)", value: "authjs" },
+                    { name: "Clerk", value: "clerk" },
+                ],
+            });
     const tools = existing.tools ??
         (await checkbox({
             message: "Which tools do you want?",

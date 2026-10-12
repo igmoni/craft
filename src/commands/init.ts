@@ -2,7 +2,11 @@ import { Command, Option } from "commander";
 
 import { generateProject } from "../generators/project.js";
 import { promptProjectConfig } from "../prompts/project.js";
-import type { PartialProjectConfig, ToolType } from "../types/utils.js";
+import type {
+  AuthOption,
+  PartialProjectConfig,
+  ToolType,
+} from "../types/utils.js";
 
 const supportedTools: ToolType[] = [
   "eslint",
@@ -45,7 +49,7 @@ const getProvidedOptions = (command: Command): PartialProjectConfig => {
   }
 
   if (command.getOptionValueSource("auth") === "cli") {
-    config.auth = options.auth as boolean;
+    config.auth = options.auth as AuthOption;
   }
 
   if (command.getOptionValueSource("tools") === "cli") {
@@ -76,7 +80,14 @@ export const registerInitCommand = (program: Command) => {
       .default("none"),
   );
 
-  init.addOption(new Option("--auth", "Include authentication").default(false));
+  init.addOption(
+    new Option(
+      "--auth [provider]",
+      "Configure an authentication provider",
+    )
+      .choices(["better-auth", "authjs", "clerk"])
+      .default(false),
+  );
 
   init.addOption(
     new Option("--tools <tools>", "Choose development tools").argParser(
