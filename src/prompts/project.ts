@@ -80,11 +80,12 @@ export const promptProjectConfig = async (
     }));
 
   const authChoice =
-    existing.auth ??
-    (await confirm({
-      message: "Add authentication?",
-      default: false,
-    }));
+    existing.auth !== undefined
+      ? existing.auth
+      : await confirm({
+          message: "Add authentication?",
+          default: false,
+        });
 
   const auth: AuthOption =
     authChoice === false

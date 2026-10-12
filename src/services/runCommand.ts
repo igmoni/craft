@@ -5,9 +5,23 @@ export async function runCommand(
   args: string[],
   cwd: string
 ): Promise<void> {
-  await execa(command, args, {
-    cwd,
-    stdio: "inherit",
-    windowsHide: true,
-  });
+  try {
+    await execa(command, args, {
+      cwd,
+      stdio: "inherit",
+      windowsHide: true,
+      reject: true,
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      throw new Error(
+        `Command failed: ${command} ${args.join(" ")}\n${error.message}`,
+        { cause: error }
+      );
+    }
+
+    throw new Error(`Command failed: ${command} ${args.join(" ")}`, {
+      cause: error,
+    });
+  }
 }

@@ -57,11 +57,12 @@ export const promptProjectConfig = async (existing = {}) => {
                 },
             ],
         }));
-    const authChoice = existing.auth ??
-        (await confirm({
+    const authChoice = existing.auth !== undefined
+        ? existing.auth
+        : await confirm({
             message: "Add authentication?",
             default: false,
-        }));
+        });
     const auth = authChoice === false
         ? false
         : typeof authChoice === "string"

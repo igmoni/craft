@@ -16,7 +16,7 @@ const parseTools = (value) => {
     if (invalidTools.length > 0) {
         throw new Error(`Unknown tools: ${invalidTools.join(", ")}`);
     }
-    return tools;
+    return [...new Set(tools)];
 };
 const getProvidedOptions = (command) => {
     const options = command.opts();
@@ -45,19 +45,39 @@ export const registerInitCommand = (program) => {
     init.addOption(new Option("-f, --framework <framework>", "Choose a framework")
         .choices(["next", "vite", "express"])
         .default("next"));
-    init.addOption(new Option("-t, --typeScript", "Use typeScript").default(false));
+    init.addOption(new Option("--ts", "Use TypeScript").default(undefined));
+    init.addOption(new Option("--js", "Use JavaScript").default(undefined));
     init.addOption(new Option("-d, --database <database>", "Choose a database")
         .choices(["postgres", "mongodb", "none"])
         .default("none"));
-    init.addOption(new Option("--auth [provider]", "Configure an authentication provider")
+    init.addOption(new Option("--auth [provider]", "Configure authentication")
         .choices(["better-auth", "authjs", "clerk"])
         .default(false));
-    init.addOption(new Option("--tools <tools>", "Choose development tools").argParser(parseTools));
-    init.action(async (projectName, options, command) => {
+    init.addOption(new Option("-t, --tools <tools>", "Comma-separated tools: eslint, prettier, husky, commitlint").argParser(parseTools));
+    init.addHelpText("after", `
+Examples:
+  $ craft init my-app
+  $ craft init my-app --framework next
+  $ craft init my-app --framework vite --database postgres
+  $ craft init my-api --framework express --database mongodb
+  $ craft init my-app --auth better-auth
+  $ craft init my-app --tools eslint,prettier
+`);
+    init.action(async (projectName, _options, command) => {
         try {
             const providedConfig = getProvidedOptions(command);
             if (projectName) {
                 providedConfig.projectName = projectName;
+            }
+            const options = command.opts();
+            if (options.ts && options.js) {
+                throw new Error("Choose either --ts or --js, not both.");
+            }
+            if (options.ts) {
+                providedConfig.typeScript = true;
+            }
+            else if (options.js) {
+                providedConfig.typeScript = false;
             }
             const config = await promptProjectConfig(providedConfig);
             await generateProject(config);

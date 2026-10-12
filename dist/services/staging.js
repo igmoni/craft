@@ -82,7 +82,15 @@ export async function mergeStagedFiles(stagingDir, targetDir) {
         for (const entry of entries.filter((item) => !item.isDirectory)) {
             const source = path.join(stagingDir, entry.relativePath);
             const destination = path.join(targetDir, entry.relativePath);
-            await fs.mkdir(path.dirname(destination), { recursive: true });
+            const parentDir = path.dirname(destination);
+            const parentInfo = await inspect(parentDir);
+            if (!parentInfo.exists) {
+                await fs.mkdir(parentDir, { recursive: true });
+                createdDirectories.push(parentDir);
+            }
+            else if (!parentInfo.isDirectory) {
+                throw new Error(`Directory conflict: ${parentDir}`);
+            }
             await fs.copyFile(source, destination, constants.COPYFILE_EXCL);
             createdFiles.push(destination);
         }

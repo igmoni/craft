@@ -6,6 +6,7 @@ import { createStagingDirectory, mergeStagedFiles, } from "../services/staging.j
 import { pathExists } from "../utils/common.js";
 import { configureAuth } from "./auth.js";
 import { configureDatabase } from "./database.js";
+import { generateEnvFile } from "./env.js";
 import { generateExpressProject } from "./frameworks/express.js";
 import { generateNextProject } from "./frameworks/next.js";
 import { generateViteProject } from "./frameworks/vite.js";
@@ -62,6 +63,8 @@ export const generateProject = async (config) => {
         await configureDatabase(config, stagingProjectDir);
         console.log("Configuring authentication...");
         await configureAuth(config, stagingProjectDir);
+        console.log("Configuring environment file...");
+        await generateEnvFile(stagingProjectDir);
         console.log("Configuring selected tools...");
         await configureTools(config, stagingProjectDir);
         await mergeStagedFiles(stagingProjectDir, targetDir);
@@ -79,9 +82,13 @@ Location: ${targetDir}
         throw new Error(`Failed to generate ${framework} project: ${error instanceof Error ? error.message : "Unknown error"}`, { cause: error });
     }
     finally {
-        await fs.rm(stagingRoot, {
+        await fs
+            .rm(stagingRoot, {
             recursive: true,
             force: true,
+        })
+            .catch((cleanupError) => {
+            console.error("Warning: Could not clean up staging directory:", cleanupError);
         });
     }
 };

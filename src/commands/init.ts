@@ -29,7 +29,7 @@ const parseTools = (value: string): ToolType[] => {
     throw new Error(`Unknown tools: ${invalidTools.join(", ")}`);
   }
 
-  return tools as ToolType[];
+  return [...new Set(tools)] as ToolType[];
 };
 
 const getProvidedOptions = (command: Command): PartialProjectConfig => {
@@ -53,13 +53,13 @@ const getProvidedOptions = (command: Command): PartialProjectConfig => {
   }
 
   if (command.getOptionValueSource("tools") === "cli") {
-    config.tools = options.tools;
+    config.tools = options.tools as ToolType[];
   }
 
   return config;
 };
 
-export const registerInitCommand = (program: Command) => {
+export const registerInitCommand = (program: Command): void => {
   const init = program
     .command("init [projectName]")
     .description("Create a new project");
@@ -70,9 +70,9 @@ export const registerInitCommand = (program: Command) => {
       .default("next")
   );
 
-  init.addOption(
-    new Option("-t, --typeScript", "Use typeScript").default(false)
-  );
+  init.addOption(new Option("--ts", "Use TypeScript").default(undefined));
+
+  init.addOption(new Option("--js", "Use JavaScript").default(undefined));
 
   init.addOption(
     new Option("-d, --database <database>", "Choose a database")
@@ -81,21 +81,35 @@ export const registerInitCommand = (program: Command) => {
   );
 
   init.addOption(
-    new Option("--auth [provider]", "Configure an authentication provider")
+    new Option("--auth [provider]", "Configure authentication")
       .choices(["better-auth", "authjs", "clerk"])
       .default(false)
   );
 
   init.addOption(
-    new Option("--tools <tools>", "Choose development tools").argParser(
-      parseTools
-    )
+    new Option(
+      "-t, --tools <tools>",
+      "Comma-separated tools: eslint, prettier, husky, commitlint"
+    ).argParser(parseTools)
+  );
+
+  init.addHelpText(
+    "after",
+    `
+Examples:
+  $ craft init my-app
+  $ craft init my-app --framework next
+  $ craft init my-app --framework vite --database postgres
+  $ craft init my-api --framework express --database mongodb
+  $ craft init my-app --auth better-auth
+  $ craft init my-app --tools eslint,prettier
+`
   );
 
   init.action(
     async (
       projectName: string | undefined,
-      options: Record<string, unknown>,
+      _options: Record<string, unknown>,
       command: Command
     ): Promise<void> => {
       try {
@@ -103,6 +117,18 @@ export const registerInitCommand = (program: Command) => {
 
         if (projectName) {
           providedConfig.projectName = projectName;
+        }
+
+        const options = command.opts();
+
+        if (options.ts && options.js) {
+          throw new Error("Choose either --ts or --js, not both.");
+        }
+
+        if (options.ts) {
+          providedConfig.typeScript = true;
+        } else if (options.js) {
+          providedConfig.typeScript = false;
         }
 
         const config = await promptProjectConfig(providedConfig);

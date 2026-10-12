@@ -11,6 +11,7 @@ import type { GenerateProjectConfig } from "../types/utils.js";
 import { pathExists } from "../utils/common.js";
 import { configureAuth } from "./auth.js";
 import { configureDatabase } from "./database.js";
+import { generateEnvFile } from "./env.js";
 import { generateExpressProject } from "./frameworks/express.js";
 import { generateNextProject } from "./frameworks/next.js";
 import { generateViteProject } from "./frameworks/vite.js";
@@ -88,6 +89,9 @@ export const generateProject = async (
     console.log("Configuring authentication...");
     await configureAuth(config, stagingProjectDir);
 
+    console.log("Configuring environment file...");
+    await generateEnvFile(stagingProjectDir);
+
     console.log("Configuring selected tools...");
     await configureTools(config, stagingProjectDir);
 
@@ -111,9 +115,16 @@ Location: ${targetDir}
       { cause: error }
     );
   } finally {
-    await fs.rm(stagingRoot, {
-      recursive: true,
-      force: true,
-    });
+    await fs
+      .rm(stagingRoot, {
+        recursive: true,
+        force: true,
+      })
+      .catch((cleanupError: unknown) => {
+        console.error(
+          "Warning: Could not clean up staging directory:",
+          cleanupError
+        );
+      });
   }
 };
