@@ -4,7 +4,7 @@
   "description": "A CLI interface to scaffold your favourite architecture, databases, auth, tools in one single command/prompt.",
   "main": "./dist/cli.js",
   "bin": {
-    "craft": "./dist/cli.js"
+    "craft": "dist/cli.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
