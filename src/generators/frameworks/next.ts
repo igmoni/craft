@@ -1,10 +1,11 @@
 import path from "node:path";
+
 import { runCommand } from "../../services/runCommand.js";
 import type { GenerateProjectConfig } from "../../types/utils.js";
 
 export async function generateNextProject(
   config: GenerateProjectConfig,
-  targetDir: string,
+  targetDir: string
 ): Promise<void> {
   const args = [
     "create-next-app@latest",
@@ -14,9 +15,9 @@ export async function generateNextProject(
     "--use-npm",
     "--skip-install",
     "--src-dir",
-    '--app',
+    "--app",
     "--disable-git",
-    "--tailwind"
+    "--tailwind",
   ];
 
   if (config.tools.includes("eslint")) {

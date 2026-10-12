@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+
 import { registerHelloCommand } from "./commands/hello.js";
 import { registerInitCommand } from "./commands/init.js";
 

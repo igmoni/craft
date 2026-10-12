@@ -1,11 +1,11 @@
-
 import fs from "node:fs/promises";
 import path from "node:path";
+
 import type { GenerateProjectConfig } from "../../types/utils.js";
 
 export async function generateExpressProject(
   config: GenerateProjectConfig,
-  targetDir: string,
+  targetDir: string
 ): Promise<void> {
   await fs.mkdir(path.join(targetDir, "src"), { recursive: true });
 
@@ -112,13 +112,13 @@ startServer();
   await fs.writeFile(
     path.join(targetDir, "package.json"),
     `${JSON.stringify(packageJson, null, 2)}\n`,
-    { flag: "wx" },
+    { flag: "wx" }
   );
 
   await fs.writeFile(
     path.join(targetDir, "src", isTS ? "index.ts" : "index.js"),
     source,
-    { flag: "wx" },
+    { flag: "wx" }
   );
 
   if (isTS) {
@@ -139,9 +139,9 @@ startServer();
           include: ["src/**/*.ts"],
         },
         null,
-        2,
+        2
       )}\n`,
-      { flag: "wx" },
+      { flag: "wx" }
     );
   }
 }

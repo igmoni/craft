@@ -1,12 +1,13 @@
-import { input, select, confirm, checkbox } from "@inquirer/prompts";
+import { checkbox, confirm, input, select } from "@inquirer/prompts";
+
 import type {
-  PartialProjectConfig,
-  GenerateProjectConfig,
   AuthOption,
+  GenerateProjectConfig,
+  PartialProjectConfig,
 } from "../types/utils.js";
 
 export const promptProjectConfig = async (
-  existing: PartialProjectConfig = {},
+  existing: PartialProjectConfig = {}
 ): Promise<GenerateProjectConfig> => {
   const projectName =
     existing.projectName ??

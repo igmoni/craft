@@ -1,4 +1,3 @@
-
 import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -10,21 +9,14 @@ type Entry = {
 };
 
 function isNotFound(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    "code" in error &&
-    error.code === "ENOENT"
-  );
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 export async function createStagingDirectory(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "craft-staging-"));
 }
 
-async function listEntries(
-  root: string,
-  current = root,
-): Promise<Entry[]> {
+async function listEntries(root: string, current = root): Promise<Entry[]> {
   const entries = await fs.readdir(current, { withFileTypes: true });
   const result: Entry[] = [];
 
@@ -38,7 +30,7 @@ async function listEntries(
 
     if (entry.isDirectory()) {
       result.push({ relativePath, isDirectory: true });
-      result.push(...await listEntries(root, absolute));
+      result.push(...(await listEntries(root, absolute)));
     } else if (entry.isFile()) {
       result.push({ relativePath, isDirectory: false });
     } else {
@@ -50,7 +42,7 @@ async function listEntries(
 }
 
 async function inspect(
-  target: string,
+  target: string
 ): Promise<{ exists: boolean; isDirectory: boolean }> {
   try {
     const stat = await fs.lstat(target);
@@ -70,7 +62,7 @@ async function inspect(
 
 export async function mergeStagedFiles(
   stagingDir: string,
-  targetDir: string,
+  targetDir: string
 ): Promise<void> {
   const entries = await listEntries(stagingDir);
   const targetInfo = await inspect(targetDir);

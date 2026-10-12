@@ -3,9 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 function isNotFound(error) {
-    return (error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT");
+    return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 export async function createStagingDirectory() {
     return fs.mkdtemp(path.join(os.tmpdir(), "craft-staging-"));
@@ -21,7 +19,7 @@ async function listEntries(root, current = root) {
         }
         if (entry.isDirectory()) {
             result.push({ relativePath, isDirectory: true });
-            result.push(...await listEntries(root, absolute));
+            result.push(...(await listEntries(root, absolute)));
         }
         else if (entry.isFile()) {
             result.push({ relativePath, isDirectory: false });

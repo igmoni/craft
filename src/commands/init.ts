@@ -22,7 +22,7 @@ const parseTools = (value: string): ToolType[] => {
     .filter(Boolean);
 
   const invalidTools = tools.filter(
-    (tool) => !supportedTools.includes(tool as ToolType),
+    (tool) => !supportedTools.includes(tool as ToolType)
   );
 
   if (invalidTools.length > 0) {
@@ -67,39 +67,36 @@ export const registerInitCommand = (program: Command) => {
   init.addOption(
     new Option("-f, --framework <framework>", "Choose a framework")
       .choices(["next", "vite", "express"])
-      .default("next"),
+      .default("next")
   );
 
   init.addOption(
-    new Option("-t, --typeScript", "Use typeScript").default(false),
+    new Option("-t, --typeScript", "Use typeScript").default(false)
   );
 
   init.addOption(
     new Option("-d, --database <database>", "Choose a database")
       .choices(["postgres", "mongodb", "none"])
-      .default("none"),
+      .default("none")
   );
 
   init.addOption(
-    new Option(
-      "--auth [provider]",
-      "Configure an authentication provider",
-    )
+    new Option("--auth [provider]", "Configure an authentication provider")
       .choices(["better-auth", "authjs", "clerk"])
-      .default(false),
+      .default(false)
   );
 
   init.addOption(
     new Option("--tools <tools>", "Choose development tools").argParser(
-      parseTools,
-    ),
+      parseTools
+    )
   );
 
   init.action(
     async (
       projectName: string | undefined,
       options: Record<string, unknown>,
-      command: Command,
+      command: Command
     ): Promise<void> => {
       try {
         const providedConfig = getProvidedOptions(command);
@@ -120,6 +117,6 @@ export const registerInitCommand = (program: Command) => {
         console.error(`\nError: ${message}`);
         process.exitCode = 1;
       }
-    },
+    }
   );
 };

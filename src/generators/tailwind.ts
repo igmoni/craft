@@ -1,10 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+
 import type { GenerateProjectConfig } from "../types/utils.js";
 
 export async function configureTailwind(
   config: GenerateProjectConfig,
-  projectDir: string,
+  projectDir: string
 ): Promise<void> {
   // create-next-app already configures Tailwind.
   if (config.framework !== "vite") return;
@@ -18,12 +19,12 @@ export async function configureTailwind(
 
   await fs.writeFile(
     packageJsonPath,
-    `${JSON.stringify(packageJson, null, 2)}\n`,
+    `${JSON.stringify(packageJson, null, 2)}\n`
   );
 
   const configFile = path.join(
     projectDir,
-    config.typeScript ? "vite.config.ts" : "vite.config.js",
+    config.typeScript ? "vite.config.ts" : "vite.config.js"
   );
 
   let viteConfig = await fs.readFile(configFile, "utf8");
@@ -36,7 +37,7 @@ export async function configureTailwind(
     viteConfig = viteConfig.replace(
       /plugins:\s*\[([^\]]*)\]/,
       (_match, plugins: string) =>
-        `plugins: [${plugins.trim()}${plugins.trim() ? ", " : ""}tailwindcss()]`,
+        `plugins: [${plugins.trim()}${plugins.trim() ? ", " : ""}tailwindcss()]`
     );
   }
 

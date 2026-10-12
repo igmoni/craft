@@ -1,4 +1,4 @@
-import { input, select, confirm, checkbox } from "@inquirer/prompts";
+import { checkbox, confirm, input, select } from "@inquirer/prompts";
 export const promptProjectConfig = async (existing = {}) => {
     const projectName = existing.projectName ??
         (await input({

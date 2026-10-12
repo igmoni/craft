@@ -9,9 +9,9 @@ export async function generateNextProject(config, targetDir) {
         "--use-npm",
         "--skip-install",
         "--src-dir",
-        '--app',
+        "--app",
         "--disable-git",
-        "--tailwind"
+        "--tailwind",
     ];
     if (config.tools.includes("eslint")) {
         args.push("--eslint");

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+
 import type { GenerateProjectConfig } from "../types/utils.js";
 
 type PackageJson = {
@@ -20,7 +21,7 @@ async function exists(filePath: string): Promise<boolean> {
 async function addEnvironmentVariable(
   filePath: string,
   key: string,
-  value: string,
+  value: string
 ): Promise<void> {
   const content = (await exists(filePath))
     ? await fs.readFile(filePath, "utf8")
@@ -53,14 +54,14 @@ async function addGitignoreRules(projectDir: string): Promise<void> {
 
     await fs.writeFile(
       filePath,
-      `${content}${separator}${missing.join("\n")}\n`,
+      `${content}${separator}${missing.join("\n")}\n`
     );
   }
 }
 
 function getDatabaseSource(
   database: "postgres" | "mongodb",
-  typeScript: boolean,
+  typeScript: boolean
 ): string {
   if (database === "postgres") {
     return typeScript
@@ -147,7 +148,7 @@ export { mongoose };
 
 export async function configureDatabase(
   config: GenerateProjectConfig,
-  projectDir: string,
+  projectDir: string
 ): Promise<void> {
   if (config.database === "none") {
     return;
@@ -155,7 +156,7 @@ export async function configureDatabase(
 
   const packagePath = path.join(projectDir, "package.json");
   const packageJson = JSON.parse(
-    await fs.readFile(packagePath, "utf8"),
+    await fs.readFile(packagePath, "utf8")
   ) as PackageJson;
 
   packageJson.dependencies ??= {};
@@ -174,7 +175,7 @@ export async function configureDatabase(
     await addEnvironmentVariable(
       path.join(projectDir, ".env.example"),
       "DATABASE_URL",
-      "postgresql://postgres:password@localhost:5432/mydb",
+      "postgresql://postgres:password@localhost:5432/mydb"
     );
   } else {
     packageJson.dependencies["mongoose"] ??= "^8.18.0";
@@ -182,7 +183,7 @@ export async function configureDatabase(
     await addEnvironmentVariable(
       path.join(projectDir, ".env.example"),
       "MONGODB_URI",
-      "mongodb://127.0.0.1:27017/mydb",
+      "mongodb://127.0.0.1:27017/mydb"
     );
   }
 
@@ -208,7 +209,7 @@ export async function configureDatabase(
     await fs.writeFile(
       databaseFile,
       getDatabaseSource(config.database, config.typeScript),
-      { flag: "wx" },
+      { flag: "wx" }
     );
   }
 

@@ -65,8 +65,11 @@ export default [
 }
 async function configurePrettier(projectDir, packageJson) {
     packageJson.devDependencies ??= {};
-    packageJson.devDependencies["prettier"] ??= "^3.6.0";
     packageJson.scripts ??= {};
+    packageJson.devDependencies["prettier"] ??= "^3.6.2";
+    packageJson.devDependencies["@trivago/prettier-plugin-sort-imports"] ??=
+        "^5.2.2";
+    packageJson.devDependencies["prettier-plugin-tailwindcss"] ??= "^0.6.14";
     packageJson.scripts.format ??=
         'prettier --write "src/**/*.{js,jsx,ts,tsx,json,css,md}" "*.{js,jsx,ts,tsx,json,css,md}"';
     packageJson.scripts["format:check"] ??=
@@ -78,12 +81,35 @@ async function configurePrettier(projectDir, packageJson) {
     }
     const prettierConfig = path.join(projectDir, ".prettierrc.json");
     if (!(await exists(prettierConfig))) {
-        await fs.writeFile(prettierConfig, `${JSON.stringify({
+        const config = {
             semi: true,
+            trailingComma: "es5",
             singleQuote: false,
-            trailingComma: "all",
             printWidth: 80,
-        }, null, 2)}\n`, { flag: "wx" });
+            tabWidth: 2,
+            useTabs: false,
+            arrowParens: "always",
+            endOfLine: "lf",
+            plugins: [
+                "@trivago/prettier-plugin-sort-imports",
+                "prettier-plugin-tailwindcss",
+            ],
+            importOrder: [
+                "^react",
+                "^next",
+                "<THIRD_PARTY_MODULES>",
+                "^@repo/(.*)$",
+                "^@/(.*)$",
+                "^[./]",
+            ],
+            importOrderSeparation: true,
+            importOrderSortSpecifiers: true,
+            importOrderGroupNamespaceSpecifiers: true,
+            importOrderCaseInsensitive: true,
+        };
+        await fs.writeFile(prettierConfig, `${JSON.stringify(config, null, 2)}\n`, {
+            flag: "wx",
+        });
     }
     const ignoreFile = path.join(projectDir, ".prettierignore");
     if (!(await exists(ignoreFile))) {

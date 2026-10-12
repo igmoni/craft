@@ -1,15 +1,15 @@
-import path from "node:path";
-import fs from "node:fs/promises";
 import { confirm } from "@inquirer/prompts";
-import { pathExists } from "../utils/common.js";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { runCommand } from "../services/runCommand.js";
 import { createStagingDirectory, mergeStagedFiles, } from "../services/staging.js";
+import { pathExists } from "../utils/common.js";
+import { configureAuth } from "./auth.js";
+import { configureDatabase } from "./database.js";
+import { generateExpressProject } from "./frameworks/express.js";
 import { generateNextProject } from "./frameworks/next.js";
 import { generateViteProject } from "./frameworks/vite.js";
-import { generateExpressProject } from "./frameworks/express.js";
-import { configureAuth } from "./auth.js";
 import { configureTailwind } from "./tailwind.js";
-import { configureDatabase } from "./database.js";
 import { configureTools } from "./tools.js";
 export const generateProject = async (config) => {
     const { projectName, framework } = config;

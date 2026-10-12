@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+
 import type { AuthProvider, GenerateProjectConfig } from "../types/utils.js";
 
 type PackageJson = {
@@ -39,13 +40,13 @@ const envVars: Record<AuthProvider, string[]> = {
 
 export async function configureAuth(
   config: GenerateProjectConfig,
-  projectDir: string,
+  projectDir: string
 ): Promise<void> {
   if (!config.auth) return;
 
   if (typeof config.auth !== "string") {
     throw new Error(
-      "Choose an authentication provider before generating the project.",
+      "Choose an authentication provider before generating the project."
     );
   }
 
@@ -58,7 +59,7 @@ export async function configureAuth(
 
   const packagePath = path.join(projectDir, "package.json");
   const packageJson = JSON.parse(
-    await fs.readFile(packagePath, "utf8"),
+    await fs.readFile(packagePath, "utf8")
   ) as PackageJson;
 
   packageJson.dependencies ??= {};
@@ -69,11 +70,11 @@ export async function configureAuth(
   const envPath = path.join(projectDir, ".env.example");
   const existingEnv = await fs.readFile(envPath, "utf8").catch(() => "");
   const existingKeys = new Set(
-    existingEnv.split(/\r?\n/).map((line) => line.split("=")[0]),
+    existingEnv.split(/\r?\n/).map((line) => line.split("=")[0])
   );
 
   const missingVars = envVars[provider].filter(
-    (entry) => !existingKeys.has(entry.split("=")[0]),
+    (entry) => !existingKeys.has(entry.split("=")[0])
   );
 
   if (missingVars.length > 0) {
@@ -81,7 +82,7 @@ export async function configureAuth(
 
     await fs.writeFile(
       envPath,
-      `${existingEnv}${separator}${missingVars.join("\n")}\n`,
+      `${existingEnv}${separator}${missingVars.join("\n")}\n`
     );
   }
 
@@ -115,6 +116,6 @@ ${
       ? "https://authjs.dev/"
       : "https://clerk.com/docs"
 }
-`,
+`
   );
 }

@@ -1,28 +1,24 @@
-import path from "node:path";
-import fs from "node:fs/promises";
 import { confirm } from "@inquirer/prompts";
+import fs from "node:fs/promises";
+import path from "node:path";
 
-import { pathExists } from "../utils/common.js";
 import { runCommand } from "../services/runCommand.js";
 import {
   createStagingDirectory,
   mergeStagedFiles,
 } from "../services/staging.js";
-
+import type { GenerateProjectConfig } from "../types/utils.js";
+import { pathExists } from "../utils/common.js";
+import { configureAuth } from "./auth.js";
+import { configureDatabase } from "./database.js";
+import { generateExpressProject } from "./frameworks/express.js";
 import { generateNextProject } from "./frameworks/next.js";
 import { generateViteProject } from "./frameworks/vite.js";
-import { generateExpressProject } from "./frameworks/express.js";
-
-import { configureAuth } from "./auth.js";
 import { configureTailwind } from "./tailwind.js";
-import { configureDatabase } from "./database.js";
-
-import type { GenerateProjectConfig } from "../types/utils.js";
-
 import { configureTools } from "./tools.js";
 
 export const generateProject = async (
-  config: GenerateProjectConfig,
+  config: GenerateProjectConfig
 ): Promise<void> => {
   const { projectName, framework } = config;
 
@@ -112,7 +108,7 @@ Location: ${targetDir}
       `Failed to generate ${framework} project: ${
         error instanceof Error ? error.message : "Unknown error"
       }`,
-      { cause: error },
+      { cause: error }
     );
   } finally {
     await fs.rm(stagingRoot, {

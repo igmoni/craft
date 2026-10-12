@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+
 import type { GenerateProjectConfig } from "../types/utils.js";
 
 type PackageJson = {
@@ -25,18 +26,18 @@ async function readPackageJson(projectDir: string): Promise<PackageJson> {
 
 async function writePackageJson(
   projectDir: string,
-  packageJson: PackageJson,
+  packageJson: PackageJson
 ): Promise<void> {
   await fs.writeFile(
     path.join(projectDir, "package.json"),
-    `${JSON.stringify(packageJson, null, 2)}\n`,
+    `${JSON.stringify(packageJson, null, 2)}\n`
   );
 }
 
 async function configureEslint(
   projectDir: string,
   packageJson: PackageJson,
-  typeScript: boolean,
+  typeScript: boolean
 ): Promise<void> {
   const configFiles = [
     "eslint.config.js",
@@ -50,7 +51,7 @@ async function configureEslint(
 
   const hasConfig = (
     await Promise.all(
-      configFiles.map((file) => exists(path.join(projectDir, file))),
+      configFiles.map((file) => exists(path.join(projectDir, file)))
     )
   ).some(Boolean);
 
@@ -94,7 +95,7 @@ export default [
     await fs.writeFile(
       path.join(projectDir, "eslint.config.mjs"),
       eslintConfig,
-      { flag: "wx" },
+      { flag: "wx" }
     );
   }
 
@@ -103,11 +104,15 @@ export default [
 
 async function configurePrettier(
   projectDir: string,
-  packageJson: PackageJson,
+  packageJson: PackageJson
 ): Promise<void> {
   packageJson.devDependencies ??= {};
-  packageJson.devDependencies["prettier"] ??= "^3.6.0";
   packageJson.scripts ??= {};
+
+  packageJson.devDependencies["prettier"] ??= "^3.6.2";
+  packageJson.devDependencies["@trivago/prettier-plugin-sort-imports"] ??=
+    "^5.2.2";
+  packageJson.devDependencies["prettier-plugin-tailwindcss"] ??= "^0.6.14";
 
   packageJson.scripts.format ??=
     'prettier --write "src/**/*.{js,jsx,ts,tsx,json,css,md}" "*.{js,jsx,ts,tsx,json,css,md}"';
@@ -122,44 +127,60 @@ async function configurePrettier(
 
     await fs.writeFile(
       tsconfigPath,
-      `${JSON.stringify(JSON.parse(tsconfig), null, 2)}\n`,
+      `${JSON.stringify(JSON.parse(tsconfig), null, 2)}\n`
     );
   }
 
   const prettierConfig = path.join(projectDir, ".prettierrc.json");
 
   if (!(await exists(prettierConfig))) {
-    await fs.writeFile(
-      prettierConfig,
-      `${JSON.stringify(
-        {
-          semi: true,
-          singleQuote: false,
-          trailingComma: "all",
-          printWidth: 80,
-        },
-        null,
-        2,
-      )}\n`,
-      { flag: "wx" },
-    );
+    const config = {
+      semi: true,
+      trailingComma: "es5",
+      singleQuote: false,
+      printWidth: 80,
+      tabWidth: 2,
+      useTabs: false,
+      arrowParens: "always",
+      endOfLine: "lf",
+      plugins: [
+        "@trivago/prettier-plugin-sort-imports",
+        "prettier-plugin-tailwindcss",
+      ],
+      importOrder: [
+        "^react",
+        "^next",
+        "<THIRD_PARTY_MODULES>",
+        "^@repo/(.*)$",
+        "^@/(.*)$",
+        "^[./]",
+      ],
+      importOrderSeparation: true,
+      importOrderSortSpecifiers: true,
+      importOrderGroupNamespaceSpecifiers: true,
+      importOrderCaseInsensitive: true,
+    };
+
+    await fs.writeFile(prettierConfig, `${JSON.stringify(config, null, 2)}\n`, {
+      flag: "wx",
+    });
   }
 
   const ignoreFile = path.join(projectDir, ".prettierignore");
 
   if (!(await exists(ignoreFile))) {
     await fs.writeFile(
-        ignoreFile,
-        "node_modules\ndist\nbuild\n.next\ncoverage\ntsconfig.json\n",
-        { flag: "wx" },
-      );
+      ignoreFile,
+      "node_modules\ndist\nbuild\n.next\ncoverage\ntsconfig.json\n",
+      { flag: "wx" }
+    );
   }
 }
 
 async function configureHusky(
   projectDir: string,
   packageJson: PackageJson,
-  useCommitlint: boolean,
+  useCommitlint: boolean
 ): Promise<void> {
   packageJson.devDependencies ??= {};
   packageJson.scripts ??= {};
@@ -187,7 +208,7 @@ async function configureHusky(
       await fs.writeFile(
         commitMsgPath,
         'npx --no -- commitlint --edit "$1"\n',
-        { flag: "wx" },
+        { flag: "wx" }
       );
     }
   }
@@ -195,7 +216,7 @@ async function configureHusky(
 
 async function configureCommitlint(
   projectDir: string,
-  packageJson: PackageJson,
+  packageJson: PackageJson
 ): Promise<void> {
   packageJson.devDependencies ??= {};
 
@@ -210,14 +231,14 @@ async function configureCommitlint(
       `export default {
   extends: ["@commitlint/config-conventional"],
 };\n`,
-      { flag: "wx" },
+      { flag: "wx" }
     );
   }
 }
 
 export async function configureTools(
   config: GenerateProjectConfig,
-  projectDir: string,
+  projectDir: string
 ): Promise<void> {
   const packageJson = await readPackageJson(projectDir);
 
