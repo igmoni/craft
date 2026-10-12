@@ -189,3 +189,9 @@ Craft is actively being developed. Issues, bug reports, and pull requests are we
 ## License
 
 Craft is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+MIT License
+
+Copyright (c) 2026 Mohan S P
+
+Permission is hereby granted, free of charge...
