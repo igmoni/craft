@@ -2,9 +2,9 @@
   "name": "@igmoni/craft",
   "version": "1.0.1",
   "description": "A CLI interface to scaffold your favourite architecture, databases, auth, tools in one single command/prompt.",
-  "main": "./dist/cli.js",
+  "main": "./dist/index.js",
   "bin": {
-    "craft": "dist/cli.js"
+    "craft": "dist/index.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
