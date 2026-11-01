@@ -9,7 +9,7 @@ import {
   mergeStagedFiles,
 } from "../services/staging.js";
 import type { GenerateProjectConfig } from "../types/utils.js";
-import { pathExists } from "../utils/common.js";
+import { pathExists } from "../utils/error.js";
 import { configureAuth } from "./auth.js";
 import { configureDatabase } from "./database.js";
 import { generateEnvFile } from "./env.js";

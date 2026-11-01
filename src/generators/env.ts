@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { pathExists } from "../utils/common.js";
+import { pathExists } from "../utils/error.js";
 
 export async function generateEnvFile(projectDir: string): Promise<void> {
   const examplePath = path.join(projectDir, ".env.example");
