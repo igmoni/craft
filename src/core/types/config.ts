@@ -10,7 +10,6 @@ export type AuthProvider = "better-auth" | "authjs" | "clerk";
 
 export type AuthOption = AuthProvider | false;
 
-// UI component libraries
 export type UILibraryType = "shadcn";
 
 export type UILibraryOption = UILibraryType | false;
@@ -21,8 +20,9 @@ export interface GenerateProjectConfig {
   typeScript: boolean;
   database: DatabaseType;
   auth: AuthOption;
-  uiLibrary: UILibraryOption;
+  uiLibrary?: UILibraryOption;
   tools: ToolType[];
+  packageManager: PackageManager;
 }
 
 export type PartialProjectConfig = Partial<GenerateProjectConfig>;

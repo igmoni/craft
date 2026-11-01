@@ -3,6 +3,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { LINKS } from "../config/links.js";
+import { getGenerator } from "../core/registry/generators.js";
+import type { GeneratorOptions } from "../core/types/config.js";
 import { runCommand } from "../services/runCommand.js";
 import {
   createStagingDirectory,
@@ -11,16 +13,15 @@ import {
 import type { GenerateProjectConfig } from "../types/utils.js";
 import { pathExists } from "../utils/error.js";
 import { configureAuth } from "./auth.js";
+import { generateExpressProject } from "./backend/express.js";
 import { configureDatabase } from "./database.js";
 import { generateEnvFile } from "./env.js";
-import { generateExpressProject } from "./backend/express.js";
 import { generateNextProject } from "./fullstack/next.js";
-import { generateViteProject } from "./frontend/vite.js";
 import { configureTailwind } from "./tailwind.js";
 import { configureTools } from "./tools.js";
 
 export const generateProject = async (
-  config: GenerateProjectConfig
+  config: GeneratorOptions
 ): Promise<void> => {
   const { projectName, framework } = config;
 
@@ -64,22 +65,25 @@ export const generateProject = async (
 
   try {
     switch (framework) {
+      case "react": {
+        const generator = getGenerator("react");
+
+        await generator.generate({
+          ...config,
+          targetDir: stagingProjectDir,
+        });
+        break;
+      }
       case "next":
         await generateNextProject(config, stagingProjectDir);
-        break;
-
-      case "vite":
-        await generateViteProject(config, stagingProjectDir);
         break;
 
       case "express":
         await generateExpressProject(config, stagingProjectDir);
         break;
 
-      default: {
-        const unsupported: never = framework;
-        throw new Error(`Unsupported framework: ${unsupported}`);
-      }
+      default:
+        throw new Error(`Generator not implemented yet: ${framework}`);
     }
     console.log("Configuring Tailwind...");
     await configureTailwind(config, stagingProjectDir);
@@ -99,7 +103,7 @@ export const generateProject = async (
     await mergeStagedFiles(stagingProjectDir, targetDir);
 
     console.log("Installing project dependencies...");
-    await runCommand("npm", ["install"], targetDir);
+    await runCommand(config.packageManager, ["install"], targetDir);
 
     console.log(`
 Project created successfully!
@@ -110,7 +114,7 @@ Location: ${targetDir}
 
 What's next?
   cd ${projectName === "." ? "" : projectName}
-  npm run dev
+  ${config.packageManager} run dev
 
 Help improve Craft:
   Feedback: ${LINKS.feedback}

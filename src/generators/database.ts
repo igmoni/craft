@@ -188,7 +188,7 @@ export async function configureDatabase(
   }
 
   const sourceDirectory =
-    config.framework === "vite"
+    config.framework === "react"
       ? "server"
       : config.framework === "next"
         ? (await exists(path.join(projectDir, "src")))

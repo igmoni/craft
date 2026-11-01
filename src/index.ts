@@ -2,8 +2,9 @@
 
 import { Command } from "commander";
 
-import { registerHelloCommand } from "./commands/hello.js";
-import { registerInitCommand } from "./commands/init.js";
+import { registerHelloCommand } from "./cli/commands/hello.js";
+import { registerInitCommand } from "./cli/commands/init.js";
+import "./core/registry/registry-generators.js";
 
 const program = new Command();
 

@@ -1,5 +1,3 @@
-import type { AuthProvider, DatabaseType, UILibraryType } from "./config.js";
-
 export type FrameworkType =
   | "angular"
   | "vue"
@@ -13,9 +11,15 @@ export type FrameworkType =
 export type FrameworkCategory = "frontend" | "backend" | "fullstack";
 
 export interface FrameworkCapabilities {
-  typeScript: boolean;
+  typescript: boolean;
+  javascript: boolean;
   tailwind: boolean;
-  database: DatabaseType[];
-  authentication: AuthProvider[];
-  uiLibraries: UILibraryType[];
+  shadcn: boolean;
+}
+
+export interface FrameworkDefinition {
+  id: FrameworkType;
+  name: string;
+  category: FrameworkCategory;
+  capabilities: FrameworkCapabilities;
 }

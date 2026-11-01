@@ -1,12 +1,12 @@
 import { Command, Option } from "commander";
 
-import { generateProject } from "../generators/project.js";
-import { promptProjectConfig } from "../prompts/project.js";
 import type {
   AuthOption,
   PartialProjectConfig,
   ToolType,
-} from "../types/utils.js";
+} from "../../core/types/config.js";
+import { generateProject } from "../../generators/project.js";
+import { promptProjectConfig } from "../prompts/project.js";
 
 const supportedTools: ToolType[] = [
   "eslint",

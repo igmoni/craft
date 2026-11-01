@@ -4,7 +4,9 @@ import type {
   AuthOption,
   GenerateProjectConfig,
   PartialProjectConfig,
-} from "../types/utils.js";
+  ToolType,
+} from "../../core/types/config.js";
+import type { PackageManager } from "../../core/types/config.js";
 
 export const promptProjectConfig = async (
   existing: PartialProjectConfig = {}
@@ -37,18 +39,14 @@ export const promptProjectConfig = async (
     (await select({
       message: "Choose a framework",
       choices: [
-        {
-          name: "Next.js",
-          value: "next",
-        },
-        {
-          name: "Vite",
-          value: "vite",
-        },
-        {
-          name: "Express",
-          value: "express",
-        },
+        { name: "Angular", value: "angular" },
+        { name: "Vue", value: "vue" },
+        { name: "React (Vite)", value: "react" },
+        { name: "NestJS", value: "nestjs" },
+        { name: "Express", value: "express" },
+        { name: "Fastify", value: "fastify" },
+        { name: "Hono", value: "hono" },
+        { name: "Next.js", value: "next" },
       ],
     }));
 
@@ -127,6 +125,19 @@ export const promptProjectConfig = async (
       ],
     }));
 
+  const packageManager =
+    existing.packageManager ??
+    ((await select({
+      message: "Choose a package manager",
+      choices: [
+        { name: "npm", value: "npm" },
+        { name: "pnpm", value: "pnpm" },
+        { name: "Yarn", value: "yarn" },
+        { name: "Bun", value: "bun" },
+      ],
+      default: "npm",
+    })) as PackageManager);
+
   return {
     projectName,
     framework,
@@ -134,5 +145,6 @@ export const promptProjectConfig = async (
     database,
     auth,
     tools,
+    packageManager,
   };
 };

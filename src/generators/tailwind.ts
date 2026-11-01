@@ -8,7 +8,7 @@ export async function configureTailwind(
   projectDir: string
 ): Promise<void> {
   // create-next-app already configures Tailwind.
-  if (config.framework !== "vite") return;
+  if (config.framework !== "react") return;
 
   const packageJsonPath = path.join(projectDir, "package.json");
   const packageJson = JSON.parse(await fs.readFile(packageJsonPath, "utf8"));

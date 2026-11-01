@@ -4,13 +4,13 @@ import path from "node:path";
 import { LINKS } from "../config/links.js";
 import { runCommand } from "../services/runCommand.js";
 import { createStagingDirectory, mergeStagedFiles, } from "../services/staging.js";
-import { pathExists } from "../utils/common.js";
+import { pathExists } from "../utils/error.js";
 import { configureAuth } from "./auth.js";
 import { configureDatabase } from "./database.js";
 import { generateEnvFile } from "./env.js";
-import { generateExpressProject } from "./frameworks/express.js";
-import { generateNextProject } from "./frameworks/next.js";
-import { generateViteProject } from "./frameworks/vite.js";
+import { generateExpressProject } from "./backend/express.js";
+import { generateNextProject } from "./fullstack/next.js";
+import { generateViteProject } from "./frontend/vite.js";
 import { configureTailwind } from "./tailwind.js";
 import { configureTools } from "./tools.js";
 export const generateProject = async (config) => {

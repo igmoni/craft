@@ -13,7 +13,7 @@ const packages: Record<
 > = {
   "better-auth": {
     next: "better-auth",
-    vite: "better-auth",
+    react: "better-auth",
     express: "better-auth",
   },
   authjs: {
@@ -21,7 +21,7 @@ const packages: Record<
   },
   clerk: {
     next: "@clerk/nextjs",
-    vite: "@clerk/clerk-react",
+    react: "@clerk/clerk-react",
     express: "@clerk/express",
   },
 };
