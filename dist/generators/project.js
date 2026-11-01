@@ -1,6 +1,7 @@
 import { confirm } from "@inquirer/prompts";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { LINKS } from "../config/links.js";
 import { runCommand } from "../services/runCommand.js";
 import { createStagingDirectory, mergeStagedFiles, } from "../services/staging.js";
 import { pathExists } from "../utils/common.js";
@@ -76,6 +77,17 @@ Project created successfully!
 Project: ${projectName}
 Framework: ${framework}
 Location: ${targetDir}
+
+What's next?
+  cd ${projectName === "." ? "" : projectName}
+  npm run dev
+
+Help improve Craft:
+  Feedback: ${LINKS.feedback}
+  GitHub:   ${LINKS.github}
+  Issues:   ${LINKS.issues}
+
+Thanks for using Craft! 🚀
 `);
     }
     catch (error) {
