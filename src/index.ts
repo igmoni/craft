@@ -4,7 +4,7 @@ import { Command } from "commander";
 
 import { registerHelloCommand } from "./cli/commands/hello.js";
 import { registerInitCommand } from "./cli/commands/init.js";
-import "./core/registry/registry-generators.js";
+import "./core/registry/register-generators.js";
 
 const program = new Command();
 

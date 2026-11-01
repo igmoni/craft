@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { LINKS } from "../config/links.js";
 import { getGenerator } from "../core/registry/generators.js";
+import "../core/registry/register-generators.js";
 import type { GeneratorOptions } from "../core/types/config.js";
 import { runCommand } from "../services/runCommand.js";
 import {
@@ -13,10 +14,9 @@ import {
 import type { GenerateProjectConfig } from "../types/utils.js";
 import { pathExists } from "../utils/error.js";
 import { configureAuth } from "./auth.js";
-import { generateExpressProject } from "./backend/express.js";
+// import { generateExpressProject } from "./backend/express.js";
 import { configureDatabase } from "./database.js";
 import { generateEnvFile } from "./env.js";
-import { generateNextProject } from "./fullstack/next.js";
 import { configureTailwind } from "./tailwind.js";
 import { configureTools } from "./tools.js";
 
@@ -74,14 +74,24 @@ export const generateProject = async (
         });
         break;
       }
-      case "next":
-        await generateNextProject(config, stagingProjectDir);
-        break;
+      case "next": {
+        const generator = getGenerator(framework);
 
-      case "express":
-        await generateExpressProject(config, stagingProjectDir);
+        await generator.generate({
+          ...config,
+          targetDir: stagingProjectDir,
+        });
         break;
+      }
+      case "express": {
+        const generator = getGenerator(framework);
 
+        await generator.generate({
+          ...config,
+          targetDir: stagingProjectDir,
+        });
+        break;
+      }
       default:
         throw new Error(`Generator not implemented yet: ${framework}`);
     }
