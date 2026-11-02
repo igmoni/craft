@@ -4,23 +4,48 @@ import type { PackageManager } from "../../core/types/config.js";
 import type { FrameworkGenerator } from "../../core/types/generator.js";
 import { runCommand } from "../../services/runCommand.js";
 
-const packageManagerCommands: Record<PackageManager, string> = {
-  npm: "npm",
-  pnpm: "pnpm",
-  yarn: "yarn",
-  bun: "bun",
+interface PackageManagerCommand {
+  command: string;
+  prefix: string[];
+}
+
+const packageManagerCommands: Record<PackageManager, PackageManagerCommand> = {
+  npm: {
+    command: "npm",
+    prefix: ["create", "vite@latest"],
+  },
+  pnpm: {
+    command: "pnpm",
+    prefix: ["create", "vite@latest"],
+  },
+  yarn: {
+    command: "yarn",
+    prefix: ["create", "vite"],
+  },
+  bun: {
+    command: "bun",
+    prefix: ["create", "vite@latest"],
+  },
 };
 
 export const vueGenerator: FrameworkGenerator = {
   async generate(options) {
     const projectDirectory = path.basename(options.targetDir);
+    const { command, prefix } = packageManagerCommands[options.packageManager];
 
-    const args = ["create", "vue@latest", projectDirectory, "--default"];
+    const args = [...prefix, projectDirectory];
 
-    await runCommand(
-      packageManagerCommands[options.packageManager],
-      args,
-      path.dirname(options.targetDir)
+    if (options.packageManager === "npm") {
+      args.push("--");
+    }
+
+    args.push(
+      "--template",
+      options.typeScript ? "vue-ts" : "vue",
+      "--no-interactive",
+      "--no-immediate"
     );
+
+    await runCommand(command, args, path.dirname(options.targetDir));
   },
 };

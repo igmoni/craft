@@ -1,33 +1,26 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type {
-  AuthProvider,
-  GenerateProjectConfig,
-} from "../core/types/config.js";
+import { getFramework } from "../core/registry/framework.js";
+import type { GenerateProjectConfig } from "../core/types/config.js";
+import type { AuthProvider } from "../core/types/framework.js";
 
 type PackageJson = {
   dependencies?: Record<string, string>;
 };
 
-const packages: Record<
-  AuthProvider,
-  Partial<Record<GenerateProjectConfig["framework"], string>>
-> = {
-  "better-auth": {
-    next: "better-auth",
-    react: "better-auth",
-    express: "better-auth",
-  },
-  authjs: {
-    next: "next-auth",
-  },
-  clerk: {
-    next: "@clerk/nextjs",
-    react: "@clerk/clerk-react",
-    express: "@clerk/express",
-  },
-};
+function getPackageName(
+  provider: AuthProvider,
+  framework: GenerateProjectConfig["framework"]
+): string {
+  if (provider === "better-auth") return "better-auth";
+  if (provider === "authjs") return "next-auth";
+
+  if (framework === "next") return "@clerk/nextjs";
+  if (framework === "react") return "@clerk/clerk-react";
+
+  return "@clerk/express";
+}
 
 function getEnvVars(
   provider: AuthProvider,
@@ -64,11 +57,16 @@ export async function configureAuth(
   if (!config.auth) return;
 
   const provider = config.auth;
-  const packageName = packages[provider]?.[config.framework];
+  const framework = getFramework(config.framework);
 
-  if (!packageName) {
-    throw new Error(`${provider} is not configured for ${config.framework}.`);
+  const supportedProviders: readonly AuthProvider[] =
+    framework.capabilities.authProviders;
+
+  if (!supportedProviders.includes(provider)) {
+    throw new Error(`${provider} is not supported for ${framework.name}.`);
   }
+
+  const packageName = getPackageName(provider, config.framework);
 
   const packagePath = path.join(projectDir, "package.json");
 
@@ -101,13 +99,13 @@ export async function configureAuth(
     );
   }
 
-  const instructionsPath = path.join(projectDir, "AUTH_SETUP.md");
-
-  const documentation = {
+  const documentation: Record<AuthProvider, string> = {
     "better-auth": "https://www.better-auth.com/docs",
     authjs: "https://authjs.dev/",
     clerk: "https://clerk.com/docs",
   };
+
+  const instructionsPath = path.join(projectDir, "AUTH_SETUP.md");
 
   await fs.writeFile(
     instructionsPath,

@@ -72,20 +72,33 @@ export const generateProject = async (
       targetDir: stagingProjectDir,
     });
 
-    console.log("Configuring Tailwind...");
-    await configureTailwind(config, stagingProjectDir);
+    // Tailwind — configured separately for React and Vue.
+    // Angular and Next.js handle it during framework scaffolding.
+    if (framework === "react" || framework === "vue") {
+      console.log("Configuring Tailwind...");
+      await configureTailwind(config, stagingProjectDir);
+    }
 
-    console.log("Configuring database...");
-    await configureDatabase(config, stagingProjectDir);
+    // Database
+    if (config.database !== "none") {
+      console.log("Configuring database...");
+      await configureDatabase(config, stagingProjectDir);
+    }
 
-    console.log("Configuring authentication...");
-    await configureAuth(config, stagingProjectDir);
+    // Authentication
+    if (config.auth) {
+      console.log("Configuring authentication...");
+      await configureAuth(config, stagingProjectDir);
+    }
 
-    console.log("Configuring environment file...");
+    // Environment
     await generateEnvFile(stagingProjectDir);
 
-    console.log("Configuring selected tools...");
-    await configureTools(config, stagingProjectDir);
+    // Development tools
+    if (config.tools.length > 0) {
+      console.log("Configuring selected tools...");
+      await configureTools(config, stagingProjectDir);
+    }
 
     await mergeStagedFiles(stagingProjectDir, targetDir);
 

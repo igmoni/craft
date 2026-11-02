@@ -10,11 +10,15 @@ export type FrameworkType =
 
 export type FrameworkCategory = "frontend" | "backend" | "fullstack";
 
+export type AuthProvider = "better-auth" | "authjs" | "clerk";
+
 export interface FrameworkCapabilities {
   typescript: boolean;
   javascript: boolean;
   tailwind: boolean;
   shadcn: boolean;
+  database: boolean;
+  authProviders: AuthProvider[]
 }
 
 export interface FrameworkDefinition {

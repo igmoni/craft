@@ -2,11 +2,12 @@ import { checkbox, confirm, input, select } from "@inquirer/prompts";
 
 import { getFramework } from "../../core/registry/framework.js";
 import type {
-  AuthProvider,
+  DatabaseType,
   GeneratorOptions,
   PartialProjectConfig,
   ToolType,
 } from "../../core/types/config.js";
+import type { AuthProvider } from "../../core/types/config.js";
 
 const authProviders: Record<
   AuthProvider,
@@ -83,23 +84,26 @@ export const promptProjectConfig = async (
     typeScript = capabilities.typescript;
   }
 
-  const database =
-    existing.database ??
-    (await select({
-      message: "Choose a database",
-      choices: [
-        { name: "PostgreSQL", value: "postgres" },
-        { name: "MongoDB", value: "mongodb" },
-        { name: "None", value: "none" },
-      ],
-    }));
+  let database: DatabaseType = "none";
 
-  const availableAuthProviders = (
-    Object.entries(authProviders) as [
-      AuthProvider,
-      Partial<Record<GeneratorOptions["framework"], string>>,
-    ][]
-  ).filter(([, frameworks]) => frameworks[framework]);
+  if (capabilities.database) {
+    database =
+      existing.database ??
+      (await select({
+        message: "Choose a database",
+        choices: [
+          { name: "PostgreSQL", value: "postgres" },
+          { name: "MongoDB", value: "mongodb" },
+          { name: "None", value: "none" },
+        ],
+      }));
+  } else if (existing.database !== undefined && existing.database !== "none") {
+    throw new Error(
+      `${frameworkInfo.name} does not support Craft database integration.`
+    );
+  }
+
+  const availableAuthProviders = capabilities.authProviders;
 
   let auth: GeneratorOptions["auth"] = false;
 
@@ -118,8 +122,8 @@ export const promptProjectConfig = async (
           ? existing.auth
           : await select({
               message: "Choose an authentication provider",
-              choices: availableAuthProviders.map(([provider, frameworks]) => ({
-                name: frameworks[framework]!,
+              choices: availableAuthProviders.map((provider) => ({
+                name: provider,
                 value: provider,
               })),
             });

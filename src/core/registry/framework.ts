@@ -7,9 +7,11 @@ export const frameworks = {
     category: "frontend",
     capabilities: {
       typescript: true,
-      javascript: false,
+      javascript: true,
       tailwind: true,
       shadcn: false,
+      database: true,
+      authProviders: ["better-auth", "clerk"],
     },
   },
 
@@ -22,6 +24,8 @@ export const frameworks = {
       javascript: true,
       tailwind: true,
       shadcn: false,
+      database: true,
+      authProviders: ["better-auth", "clerk"],
     },
   },
 
@@ -34,6 +38,8 @@ export const frameworks = {
       javascript: true,
       tailwind: true,
       shadcn: true,
+      database: true,
+      authProviders: ["better-auth", "clerk"],
     },
   },
 
@@ -46,6 +52,8 @@ export const frameworks = {
       javascript: true,
       tailwind: false,
       shadcn: false,
+      database: true,
+      authProviders: ["better-auth", "clerk"],
     },
   },
 
@@ -58,6 +66,8 @@ export const frameworks = {
       javascript: true,
       tailwind: false,
       shadcn: false,
+      database: true,
+      authProviders: ["better-auth", "clerk"],
     },
   },
 
@@ -70,6 +80,8 @@ export const frameworks = {
       javascript: true,
       tailwind: false,
       shadcn: false,
+      database: true,
+      authProviders: ["better-auth", "clerk"],
     },
   },
 
@@ -82,6 +94,8 @@ export const frameworks = {
       javascript: true,
       tailwind: false,
       shadcn: false,
+      database: true,
+      authProviders: ["better-auth", "clerk"],
     },
   },
 
@@ -94,6 +108,8 @@ export const frameworks = {
       javascript: true,
       tailwind: true,
       shadcn: true,
+      database: true,
+      authProviders: ["better-auth", "clerk"],
     },
   },
 } satisfies Record<FrameworkType, FrameworkDefinition>;
