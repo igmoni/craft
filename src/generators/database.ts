@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type { GenerateProjectConfig } from "../types/utils.js";
+import type { GenerateProjectConfig } from "../core/types/config.js";
 
 type PackageJson = {
   dependencies?: Record<string, string>;
@@ -47,6 +47,7 @@ async function addGitignoreRules(projectDir: string): Promise<void> {
     : "";
 
   const existing = new Set(content.split(/\r?\n/).map((line) => line.trim()));
+
   const missing = rules.filter((rule) => !existing.has(rule));
 
   if (missing.length > 0) {
@@ -59,54 +60,71 @@ async function addGitignoreRules(projectDir: string): Promise<void> {
   }
 }
 
-function getDatabaseSource(
-  database: "postgres" | "mongodb",
-  typeScript: boolean
-): string {
-  if (database === "postgres") {
-    return typeScript
-      ? `import "dotenv/config";
-import pg from "pg";
+function getPrismaSchema(): string {
+  return `generator client {
+  provider = "prisma-client-js"
+}
 
-const { Pool } = pg;
+datasource db {
+  provider = "postgresql"
+}
 
-export const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
+`;
+}
+
+function getPrismaConfig(): string {
+  return `import "dotenv/config";
+import { defineConfig, env } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
+  datasource: {
+    url: env("DATABASE_URL"),
+  },
 });
+`;
+}
+
+function getPrismaSource(): string {
+  return `import "dotenv/config";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not configured.");
+}
+
+const adapter = new PrismaPg({ connectionString });
+
+const globalForPrisma = globalThis as unknown as {
+  prisma?: PrismaClient;
+};
+
+export const prisma =
+  globalForPrisma.prisma ?? new PrismaClient({ adapter });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
 
 export async function checkDatabaseConnection(): Promise<void> {
-  const client = await db.connect();
-
-  try {
-    await client.query("SELECT 1");
-  } finally {
-    client.release();
-  }
+  await prisma.$connect();
 }
-`
-      : `import "dotenv/config";
-import pg from "pg";
 
-const { Pool } = pg;
-
-export const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-export async function checkDatabaseConnection() {
-  const client = await db.connect();
-
-  try {
-    await client.query("SELECT 1");
-  } finally {
-    client.release();
-  }
+export async function disconnectDatabase(): Promise<void> {
+  await prisma.$disconnect();
 }
 `;
-  }
+}
 
-  return typeScript
-    ? `import "dotenv/config";
+function getMongooseSource(typeScript: boolean): string {
+  if (typeScript) {
+    return `import "dotenv/config";
 import mongoose from "mongoose";
 
 export async function connectDatabase(): Promise<void> {
@@ -124,8 +142,10 @@ export async function connectDatabase(): Promise<void> {
 }
 
 export { mongoose };
-`
-    : `import "dotenv/config";
+`;
+  }
+
+  return `import "dotenv/config";
 import mongoose from "mongoose";
 
 export async function connectDatabase() {
@@ -146,6 +166,15 @@ export { mongoose };
 `;
 }
 
+async function writeFileIfMissing(
+  filePath: string,
+  content: string
+): Promise<void> {
+  if (!(await exists(filePath))) {
+    await fs.writeFile(filePath, content, { flag: "wx" });
+  }
+}
+
 export async function configureDatabase(
   config: GenerateProjectConfig,
   projectDir: string
@@ -155,27 +184,47 @@ export async function configureDatabase(
   }
 
   const packagePath = path.join(projectDir, "package.json");
+
   const packageJson = JSON.parse(
     await fs.readFile(packagePath, "utf8")
   ) as PackageJson;
 
   packageJson.dependencies ??= {};
+  packageJson.scripts ??= {};
 
-  // Load environment variables consistently outside Next.js too.
   packageJson.dependencies["dotenv"] ??= "^16.4.7";
 
   if (config.database === "postgres") {
+    packageJson.dependencies["@prisma/client"] ??= "^7.10.0";
+    packageJson.dependencies["@prisma/adapter-pg"] ??= "^7.10.0";
     packageJson.dependencies["pg"] ??= "^8.16.3";
 
-    if (config.typeScript) {
-      packageJson.devDependencies ??= {};
-      packageJson.devDependencies["@types/pg"] ??= "^8.15.5";
-    }
+    packageJson.devDependencies ??= {};
+    packageJson.devDependencies["prisma"] ??= "^7.10.0";
+
+    packageJson.scripts["db:generate"] ??= "prisma generate";
+    packageJson.scripts["db:migrate"] ??= "prisma migrate dev";
+    packageJson.scripts["db:deploy"] ??= "prisma migrate deploy";
+    packageJson.scripts["db:studio"] ??= "prisma studio";
 
     await addEnvironmentVariable(
       path.join(projectDir, ".env.example"),
       "DATABASE_URL",
       "postgresql://postgres:password@localhost:5432/mydb"
+    );
+
+    const prismaDirectory = path.join(projectDir, "prisma");
+
+    await fs.mkdir(prismaDirectory, { recursive: true });
+
+    await writeFileIfMissing(
+      path.join(prismaDirectory, "schema.prisma"),
+      getPrismaSchema()
+    );
+
+    await writeFileIfMissing(
+      path.join(projectDir, "prisma.config.ts"),
+      getPrismaConfig()
     );
   } else {
     packageJson.dependencies["mongoose"] ??= "^8.18.0";
@@ -197,21 +246,18 @@ export async function configureDatabase(
         : "src";
 
   const databaseDirectory = path.join(projectDir, sourceDirectory);
+
   await fs.mkdir(databaseDirectory, { recursive: true });
 
   const extension = config.typeScript ? "ts" : "js";
-  const fileName =
-    config.framework === "express" ? `db.${extension}` : `db.${extension}`;
+  const databaseFile = path.join(databaseDirectory, `db.${extension}`);
 
-  const databaseFile = path.join(databaseDirectory, fileName);
+  const databaseSource =
+    config.database === "postgres"
+      ? getPrismaSource()
+      : getMongooseSource(config.typeScript);
 
-  if (!(await exists(databaseFile))) {
-    await fs.writeFile(
-      databaseFile,
-      getDatabaseSource(config.database, config.typeScript),
-      { flag: "wx" }
-    );
-  }
+  await writeFileIfMissing(databaseFile, databaseSource);
 
   await addGitignoreRules(projectDir);
 

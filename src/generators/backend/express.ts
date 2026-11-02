@@ -37,7 +37,8 @@ export const expressGenerator: FrameworkGenerator = {
     let databaseStartup = "";
 
     if (options.database === "postgres") {
-      databaseImport = 'import { checkDatabaseConnection, db } from "./db.js";';
+      databaseImport =
+        'import { checkDatabaseConnection, disconnectDatabase } from "./db.js";';
 
       databaseStartup = `
     await checkDatabaseConnection();
@@ -52,7 +53,7 @@ export const expressGenerator: FrameworkGenerator = {
 
     const databaseClose =
       options.database === "postgres"
-        ? "\n    await db.end();"
+        ? "\n    await disconnectDatabase();"
         : options.database === "mongodb"
           ? "\n    await mongoose.disconnect();"
           : "";

@@ -1,13 +1,17 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type { GenerateProjectConfig } from "../types/utils.js";
+import type { GeneratorOptions, PackageManager } from "../core/types/config.js";
 
 type PackageJson = {
   scripts?: Record<string, string>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
 };
+
+function getRunCommand(packageManager: PackageManager, script: string): string {
+  return `${packageManager} run ${script}`;
+}
 
 async function exists(filePath: string): Promise<boolean> {
   try {
@@ -180,6 +184,7 @@ async function configurePrettier(
 async function configureHusky(
   projectDir: string,
   packageJson: PackageJson,
+  packageManager: PackageManager,
   useCommitlint: boolean
 ): Promise<void> {
   packageJson.devDependencies ??= {};
@@ -195,10 +200,12 @@ async function configureHusky(
 
   if (!(await exists(preCommitPath))) {
     const command = packageJson.scripts.lint
-      ? "npm run lint"
-      : "npm run format:check";
+      ? getRunCommand(packageManager, "lint")
+      : getRunCommand(packageManager, "format:check");
 
-    await fs.writeFile(preCommitPath, `${command}\n`, { flag: "wx" });
+    await fs.writeFile(preCommitPath, `${command}\n`, {
+      flag: "wx",
+    });
   }
 
   if (useCommitlint) {
@@ -207,13 +214,12 @@ async function configureHusky(
     if (!(await exists(commitMsgPath))) {
       await fs.writeFile(
         commitMsgPath,
-        'npx --no -- commitlint --edit "$1"\n',
+        'node_modules/.bin/commitlint --edit "$1"\n',
         { flag: "wx" }
       );
     }
   }
 }
-
 async function configureCommitlint(
   projectDir: string,
   packageJson: PackageJson
@@ -235,9 +241,8 @@ async function configureCommitlint(
     );
   }
 }
-
 export async function configureTools(
-  config: GenerateProjectConfig,
+  config: GeneratorOptions,
   projectDir: string
 ): Promise<void> {
   const packageJson = await readPackageJson(projectDir);
@@ -258,7 +263,12 @@ export async function configureTools(
   }
 
   if (useHusky) {
-    await configureHusky(projectDir, packageJson, useCommitlint);
+    await configureHusky(
+      projectDir,
+      packageJson,
+      config.packageManager,
+      useCommitlint
+    );
   }
 
   await writePackageJson(projectDir, packageJson);

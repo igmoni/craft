@@ -1,14 +1,19 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type { GenerateProjectConfig } from "../types/utils.js";
+import type { GenerateProjectConfig } from "../core/types/config.js";
 
 export async function configureTailwind(
   config: GenerateProjectConfig,
   projectDir: string
 ): Promise<void> {
-  // create-next-app already configures Tailwind.
-  if (config.framework !== "react") return;
+  const framework = config.framework;
+
+  // Next.js is handled by create-next-app.
+  if (framework === "next") return;
+
+  // Tailwind integration currently supports Vite-based frameworks.
+  if (framework !== "react" && framework !== "vue") return;
 
   const packageJsonPath = path.join(projectDir, "package.json");
   const packageJson = JSON.parse(await fs.readFile(packageJsonPath, "utf8"));
@@ -43,7 +48,10 @@ export async function configureTailwind(
 
   await fs.writeFile(configFile, viteConfig);
 
-  const cssPath = path.join(projectDir, "src", "index.css");
+  const cssFile =
+    framework === "react" ? "index.css" : path.join("assets", "main.css");
+
+  const cssPath = path.join(projectDir, "src", cssFile);
   let css = await fs.readFile(cssPath, "utf8");
 
   if (!css.includes('@import "tailwindcss";')) {

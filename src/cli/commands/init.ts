@@ -1,7 +1,7 @@
 import { Command, Option } from "commander";
 
 import type {
-  AuthOption,
+  AuthProvider,
   PartialProjectConfig,
   ToolType,
 } from "../../core/types/config.js";
@@ -37,23 +37,27 @@ const getProvidedOptions = (command: Command): PartialProjectConfig => {
   const config: PartialProjectConfig = {};
 
   if (command.getOptionValueSource("framework") === "cli") {
-    config.framework = options.framework as PartialProjectConfig["framework"];
-  }
-
-  if (command.getOptionValueSource("typeScript") === "cli") {
-    config.typeScript = options.typeScript as boolean;
+    config.framework = options.framework;
   }
 
   if (command.getOptionValueSource("database") === "cli") {
-    config.database = options.database as PartialProjectConfig["database"];
+    config.database = options.database;
   }
 
   if (command.getOptionValueSource("auth") === "cli") {
-    config.auth = options.auth as AuthOption;
+    config.auth = options.auth as AuthProvider;
   }
 
   if (command.getOptionValueSource("tools") === "cli") {
-    config.tools = options.tools as ToolType[];
+    config.tools = options.tools;
+  }
+
+  if (command.getOptionValueSource("packageManager") === "cli") {
+    config.packageManager = options.packageManager;
+  }
+
+  if (command.getOptionValueSource("shadcn") === "cli") {
+    config.uiLibrary = options.shadcn ? "shadcn" : false;
   }
 
   return config;
@@ -65,26 +69,38 @@ export const registerInitCommand = (program: Command): void => {
     .description("Create a new project");
 
   init.addOption(
-    new Option("-f, --framework <framework>", "Choose a framework")
-      .choices(["next", "vite", "express"])
-      .default("next")
+    new Option("-f, --framework <framework>", "Choose a framework").choices([
+      "angular",
+      "vue",
+      "react",
+      "nestjs",
+      "express",
+      "fastify",
+      "hono",
+      "next",
+    ])
   );
 
-  init.addOption(new Option("--ts", "Use TypeScript").default(undefined));
-
-  init.addOption(new Option("--js", "Use JavaScript").default(undefined));
+  init.addOption(new Option("--ts", "Use TypeScript"));
+  init.addOption(new Option("--js", "Use JavaScript"));
 
   init.addOption(
-    new Option("-d, --database <database>", "Choose a database")
-      .choices(["postgres", "mongodb", "none"])
-      .default("none")
+    new Option("-d, --database <database>", "Choose a database").choices([
+      "postgres",
+      "mongodb",
+      "none",
+    ])
   );
 
   init.addOption(
-    new Option("--auth [provider]", "Configure authentication")
-      .choices(["better-auth", "authjs", "clerk"])
-      .default(false)
+    new Option("--auth <provider>", "Configure authentication").choices([
+      "better-auth",
+      "authjs",
+      "clerk",
+    ])
   );
+
+  init.addOption(new Option("--shadcn", "Add shadcn/ui integration"));
 
   init.addOption(
     new Option(
@@ -93,16 +109,26 @@ export const registerInitCommand = (program: Command): void => {
     ).argParser(parseTools)
   );
 
+  init.addOption(
+    new Option(
+      "-p, --package-manager <manager>",
+      "Choose a package manager"
+    ).choices(["npm", "pnpm", "yarn", "bun"])
+  );
+
   init.addHelpText(
     "after",
     `
 Examples:
   $ craft init my-app
   $ craft init my-app --framework next
-  $ craft init my-app --framework vite --database postgres
+  $ craft init my-app --framework angular --ts
+  $ craft init my-app --framework react --database postgres
   $ craft init my-api --framework express --database mongodb
   $ craft init my-app --auth better-auth
+  $ craft init my-app --shadcn
   $ craft init my-app --tools eslint,prettier
+  $ craft init my-app --package-manager pnpm
 `
   );
 

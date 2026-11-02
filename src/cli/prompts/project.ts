@@ -1,16 +1,35 @@
 import { checkbox, confirm, input, select } from "@inquirer/prompts";
 
+import { getFramework } from "../../core/registry/framework.js";
 import type {
-  AuthOption,
-  GenerateProjectConfig,
+  AuthProvider,
+  GeneratorOptions,
   PartialProjectConfig,
   ToolType,
 } from "../../core/types/config.js";
-import type { PackageManager } from "../../core/types/config.js";
+
+const authProviders: Record<
+  AuthProvider,
+  Partial<Record<GeneratorOptions["framework"], string>>
+> = {
+  "better-auth": {
+    next: "Better Auth",
+    react: "Better Auth",
+    express: "Better Auth",
+  },
+  authjs: {
+    next: "Auth.js",
+  },
+  clerk: {
+    next: "Clerk",
+    react: "Clerk",
+    express: "Clerk",
+  },
+};
 
 export const promptProjectConfig = async (
   existing: PartialProjectConfig = {}
-): Promise<GenerateProjectConfig> => {
+): Promise<GeneratorOptions> => {
   const projectName =
     existing.projectName ??
     (
@@ -19,9 +38,7 @@ export const promptProjectConfig = async (
         validate: (value) => {
           const name = value.trim();
 
-          if (!name) {
-            return "Project name is required.";
-          }
+          if (!name) return "Project name is required.";
 
           if (!/^[a-zA-Z0-9-_]+$/.test(name)) {
             return "Use only letters, numbers, hyphens, and underscores.";
@@ -50,84 +67,91 @@ export const promptProjectConfig = async (
       ],
     }));
 
-  const typeScript =
-    existing.typeScript ??
-    (await confirm({
-      message: "Use typeScript?",
+  const frameworkInfo = getFramework(framework);
+  const capabilities = frameworkInfo.capabilities;
+
+  let typeScript: boolean;
+
+  if (existing.typeScript !== undefined) {
+    typeScript = existing.typeScript;
+  } else if (capabilities.typescript && capabilities.javascript) {
+    typeScript = await confirm({
+      message: "Use TypeScript?",
       default: true,
-    }));
+    });
+  } else {
+    typeScript = capabilities.typescript;
+  }
 
   const database =
     existing.database ??
     (await select({
       message: "Choose a database",
       choices: [
-        {
-          name: "PostgreSQL",
-          value: "postgres",
-        },
-        {
-          name: "MongoDB",
-          value: "mongodb",
-        },
-        {
-          name: "None",
-          value: "none",
-        },
+        { name: "PostgreSQL", value: "postgres" },
+        { name: "MongoDB", value: "mongodb" },
+        { name: "None", value: "none" },
       ],
     }));
 
-  const authChoice =
-    existing.auth !== undefined
-      ? existing.auth
-      : await confirm({
-          message: "Add authentication?",
-          default: false,
-        });
+  const availableAuthProviders = (
+    Object.entries(authProviders) as [
+      AuthProvider,
+      Partial<Record<GeneratorOptions["framework"], string>>,
+    ][]
+  ).filter(([, frameworks]) => frameworks[framework]);
 
-  const auth: AuthOption =
-    authChoice === false
-      ? false
-      : typeof authChoice === "string"
-        ? authChoice
-        : await select({
-            message: "Choose an authentication provider",
-            choices: [
-              { name: "Better Auth", value: "better-auth" },
-              { name: "Auth.js (Next.js only)", value: "authjs" },
-              { name: "Clerk", value: "clerk" },
-            ],
+  let auth: GeneratorOptions["auth"] = false;
+
+  if (availableAuthProviders.length > 0) {
+    const wantsAuth =
+      existing.auth !== undefined
+        ? existing.auth !== false
+        : await confirm({
+            message: "Add authentication?",
+            default: false,
           });
 
-  const tools =
+    if (wantsAuth) {
+      auth =
+        existing.auth !== undefined
+          ? existing.auth
+          : await select({
+              message: "Choose an authentication provider",
+              choices: availableAuthProviders.map(([provider, frameworks]) => ({
+                name: frameworks[framework]!,
+                value: provider,
+              })),
+            });
+    }
+  }
+
+  const uiLibrary = capabilities.shadcn
+    ? existing.uiLibrary !== undefined
+      ? existing.uiLibrary
+      : (await confirm({
+            message: "Add shadcn/ui?",
+            default: false,
+          }))
+        ? "shadcn"
+        : false
+    : false;
+
+  const tools: ToolType[] =
     existing.tools ??
     (await checkbox({
       message: "Which tools do you want?",
       choices: [
-        {
-          name: "ESLint",
-          value: "eslint",
-          checked: true,
-        },
-        {
-          name: "Prettier",
-          value: "prettier",
-          checked: true,
-        },
-        {
-          name: "Husky",
-          value: "husky",
-        },
-        {
-          name: "Commitlint",
-          value: "commitlint",
-        },
+        { name: "ESLint", value: "eslint", checked: true },
+        { name: "Prettier", value: "prettier", checked: true },
+        { name: "Husky", value: "husky" },
+        { name: "Commitlint", value: "commitlint" },
       ],
     }));
 
   const packageManager =
     existing.packageManager ??
-    ((await select({
+    (await select({
       message: "Choose a package manager",
       choices: [
         { name: "npm", value: "npm" },
@@ -136,7 +160,7 @@ export const promptProjectConfig = async (
         { name: "Bun", value: "bun" },
       ],
       default: "npm",
-    })) as PackageManager);
+    }));
 
   return {
     projectName,
@@ -144,6 +168,7 @@ export const promptProjectConfig = async (
     typeScript,
     database,
     auth,
+    uiLibrary,
     tools,
     packageManager,
   };

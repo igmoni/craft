@@ -25,7 +25,7 @@ export interface GenerateProjectConfig {
   packageManager: PackageManager;
 }
 
-export type PartialProjectConfig = Partial<GenerateProjectConfig>;
+export type PartialProjectConfig = Partial<GeneratorOptions>;
 
 export interface GeneratorOptions extends GenerateProjectConfig {
   packageManager: PackageManager;

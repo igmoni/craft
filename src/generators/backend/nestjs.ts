@@ -19,11 +19,13 @@ export const nestjsGenerator: FrameworkGenerator = {
 
     const args = [
       ...prefix,
-      "@nestjs/cli",
+      "@nestjs/cli@latest",
       "new",
       projectDirectory,
       "--package-manager",
       options.packageManager,
+      "--language",
+      options.typeScript ? "TS" : "JS",
       "--skip-git",
       "--skip-install",
     ];

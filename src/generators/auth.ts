@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type { AuthProvider, GenerateProjectConfig } from "../types/utils.js";
+import type {
+  AuthProvider,
+  GenerateProjectConfig,
+} from "../core/types/config.js";
 
 type PackageJson = {
   dependencies?: Record<string, string>;
@@ -26,17 +29,33 @@ const packages: Record<
   },
 };
 
-const envVars: Record<AuthProvider, string[]> = {
-  "better-auth": [
-    "BETTER_AUTH_SECRET=replace-with-a-secure-random-secret",
-    "BETTER_AUTH_URL=http://localhost:3000",
-  ],
-  authjs: ["AUTH_SECRET=replace-with-a-secure-random-secret"],
-  clerk: [
-    "VITE_CLERK_PUBLISHABLE_KEY=replace-with-your-publishable-key",
+function getEnvVars(
+  provider: AuthProvider,
+  framework: GenerateProjectConfig["framework"]
+): string[] {
+  if (provider === "better-auth") {
+    return [
+      "BETTER_AUTH_SECRET=replace-with-a-secure-random-secret",
+      "BETTER_AUTH_URL=http://localhost:3000",
+    ];
+  }
+
+  if (provider === "authjs") {
+    return ["AUTH_SECRET=replace-with-a-secure-random-secret"];
+  }
+
+  const publishableKey =
+    framework === "next"
+      ? "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+      : framework === "react"
+        ? "VITE_CLERK_PUBLISHABLE_KEY"
+        : "CLERK_PUBLISHABLE_KEY";
+
+  return [
+    `${publishableKey}=replace-with-your-publishable-key`,
     "CLERK_SECRET_KEY=replace-with-your-secret-key",
-  ],
-};
+  ];
+}
 
 export async function configureAuth(
   config: GenerateProjectConfig,
@@ -44,13 +63,7 @@ export async function configureAuth(
 ): Promise<void> {
   if (!config.auth) return;
 
-  if (typeof config.auth !== "string") {
-    throw new Error(
-      "Choose an authentication provider before generating the project."
-    );
-  }
-
-  const provider = config.auth as AuthProvider;
+  const provider = config.auth;
   const packageName = packages[provider]?.[config.framework];
 
   if (!packageName) {
@@ -58,6 +71,7 @@ export async function configureAuth(
   }
 
   const packagePath = path.join(projectDir, "package.json");
+
   const packageJson = JSON.parse(
     await fs.readFile(packagePath, "utf8")
   ) as PackageJson;
@@ -69,11 +83,12 @@ export async function configureAuth(
 
   const envPath = path.join(projectDir, ".env.example");
   const existingEnv = await fs.readFile(envPath, "utf8").catch(() => "");
+
   const existingKeys = new Set(
     existingEnv.split(/\r?\n/).map((line) => line.split("=")[0])
   );
 
-  const missingVars = envVars[provider].filter(
+  const missingVars = getEnvVars(provider, config.framework).filter(
     (entry) => !existingKeys.has(entry.split("=")[0])
   );
 
@@ -88,6 +103,12 @@ export async function configureAuth(
 
   const instructionsPath = path.join(projectDir, "AUTH_SETUP.md");
 
+  const documentation = {
+    "better-auth": "https://www.better-auth.com/docs",
+    authjs: "https://authjs.dev/",
+    clerk: "https://clerk.com/docs",
+  };
+
   await fs.writeFile(
     instructionsPath,
     `# Authentication setup
@@ -97,7 +118,7 @@ Framework: ${config.framework}
 
 ## Required steps
 
-1. Install dependencies with \`npm install\`.
+1. Install dependencies using your selected package manager.
 2. Create your provider account if required.
 3. Configure the environment variables listed in \`.env.example\`.
 4. Follow the provider's official framework integration guide.
@@ -109,13 +130,7 @@ provider-specific application wiring or account setup.
 
 ## Official documentation
 
-${
-  provider === "better-auth"
-    ? "https://www.better-auth.com/docs"
-    : provider === "authjs"
-      ? "https://authjs.dev/"
-      : "https://clerk.com/docs"
-}
+${documentation[provider]}
 `
   );
 }

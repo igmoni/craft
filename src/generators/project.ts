@@ -11,14 +11,13 @@ import {
   createStagingDirectory,
   mergeStagedFiles,
 } from "../services/staging.js";
-import type { GenerateProjectConfig } from "../types/utils.js";
 import { pathExists } from "../utils/error.js";
 import { configureAuth } from "./auth.js";
-// import { generateExpressProject } from "./backend/express.js";
 import { configureDatabase } from "./database.js";
 import { generateEnvFile } from "./env.js";
 import { configureTailwind } from "./tailwind.js";
 import { configureTools } from "./tools.js";
+import { configureShadcn } from "./ui/shadcn.js";
 
 export const generateProject = async (
   config: GeneratorOptions
@@ -64,37 +63,15 @@ export const generateProject = async (
   const stagingProjectDir = path.join(stagingRoot, actualProjectName);
 
   try {
-    switch (framework) {
-      case "react": {
-        const generator = getGenerator("react");
+    const generator = getGenerator(framework);
 
-        await generator.generate({
-          ...config,
-          targetDir: stagingProjectDir,
-        });
-        break;
-      }
-      case "next": {
-        const generator = getGenerator(framework);
+    console.log(`Generating ${framework} project...`);
 
-        await generator.generate({
-          ...config,
-          targetDir: stagingProjectDir,
-        });
-        break;
-      }
-      case "express": {
-        const generator = getGenerator(framework);
+    await generator.generate({
+      ...config,
+      targetDir: stagingProjectDir,
+    });
 
-        await generator.generate({
-          ...config,
-          targetDir: stagingProjectDir,
-        });
-        break;
-      }
-      default:
-        throw new Error(`Generator not implemented yet: ${framework}`);
-    }
     console.log("Configuring Tailwind...");
     await configureTailwind(config, stagingProjectDir);
 
@@ -114,6 +91,20 @@ export const generateProject = async (
 
     console.log("Installing project dependencies...");
     await runCommand(config.packageManager, ["install"], targetDir);
+
+    if (config.uiLibrary === "shadcn") {
+      console.log("Configuring shadcn/ui...");
+      await configureShadcn(config, targetDir);
+    }
+
+    if (config.database === "postgres") {
+      console.log("Generating Prisma client...");
+      await runCommand(
+        config.packageManager,
+        ["run", "db:generate"],
+        targetDir
+      );
+    }
 
     console.log(`
 Project created successfully!
