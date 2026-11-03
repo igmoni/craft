@@ -1,15 +1,6 @@
-import type {
-  GeneratorOptions,
-  PackageManager,
-} from "../../core/types/config.js";
+import type { GeneratorOptions } from "../../core/types/config.js";
+import { getDlxCommand } from "../../services/packageManager.js";
 import { runCommand } from "../../services/runCommand.js";
-
-const packageManagerCommands: Record<PackageManager, string[]> = {
-  npm: ["npx", "--yes"],
-  pnpm: ["pnpm", "dlx"],
-  yarn: ["yarn", "dlx"],
-  bun: ["bunx", "--bun"],
-};
 
 export async function configureShadcn(
   config: GeneratorOptions,
@@ -18,22 +9,20 @@ export async function configureShadcn(
   if (config.uiLibrary !== "shadcn") return;
 
   if (config.framework !== "next" && config.framework !== "react") {
-    throw new Error(`shadcn/ui is not supported for ${config.framework}.`);
+    throw new Error(
+      `shadcn/ui is not supported for "${config.framework}". Only Next.js and React (Vite) are supported.`
+    );
   }
-
-  const [command, ...prefix] = packageManagerCommands[config.packageManager];
 
   const template = config.framework === "next" ? "next" : "vite";
 
-  const args = [
-    ...prefix,
-    "shadcn@latest",
+  const dlx = getDlxCommand(config.packageManager, "shadcn@latest", [
     "init",
     `--template=${template}`,
-    "--preset=nova",
+    "--defaults",
     "--yes",
     "--no-monorepo",
-  ];
+  ]);
 
-  await runCommand(command, args, projectDir);
+  await runCommand(dlx.command, dlx.args, projectDir);
 }

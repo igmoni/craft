@@ -1,16 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-async function exists(filePath) {
-    try {
-        await fs.access(filePath);
-        return true;
-    }
-    catch {
-        return false;
-    }
-}
+import { getRunScriptCommand } from "../services/packageManager.js";
+import { pathExists } from "../utils/error.js";
 async function readPackageJson(projectDir) {
     const packagePath = path.join(projectDir, "package.json");
+    if (!(await pathExists(packagePath))) {
+        return {};
+    }
     const content = await fs.readFile(packagePath, "utf8");
     return JSON.parse(content);
 }
@@ -22,39 +18,51 @@ async function configureEslint(projectDir, packageJson, typeScript) {
         "eslint.config.js",
         "eslint.config.mjs",
         "eslint.config.cjs",
+        "eslint.config.ts",
         ".eslintrc",
         ".eslintrc.json",
         ".eslintrc.js",
         ".eslintrc.cjs",
+        ".eslintrc.yaml",
+        ".eslintrc.yml",
     ];
-    const hasConfig = (await Promise.all(configFiles.map((file) => exists(path.join(projectDir, file))))).some(Boolean);
+    const hasConfig = (await Promise.all(configFiles.map((file) => pathExists(path.join(projectDir, file))))).some(Boolean);
     packageJson.devDependencies ??= {};
     packageJson.scripts ??= {};
+    packageJson.devDependencies.eslint ??= "latest";
     if (!hasConfig) {
-        packageJson.devDependencies["eslint"] ??= "^9.0.0";
-        packageJson.devDependencies["@eslint/js"] ??= "^9.0.0";
-        packageJson.devDependencies["globals"] ??= "^16.0.0";
+        packageJson.devDependencies["@eslint/js"] ??= "latest";
+        packageJson.devDependencies.globals ??= "latest";
+        if (typeScript) {
+            packageJson.devDependencies["typescript-eslint"] ??= "latest";
+        }
         const typescriptImports = typeScript
-            ? `import tseslint from "typescript-eslint";\n`
+            ? 'import tseslint from "typescript-eslint";\n'
             : "";
         const typescriptConfig = typeScript
-            ? `\n  ...tseslint.configs.recommended,`
+            ? "\n  ...tseslint.configs.recommended,"
             : "";
-        if (typeScript) {
-            packageJson.devDependencies["typescript-eslint"] ??= "^8.0.0";
-        }
         const eslintConfig = `import js from "@eslint/js";
 import globals from "globals";
 ${typescriptImports}
 export default [
   {
-    ignores: ["node_modules/**", "dist/**", "build/**"],
+    ignores: [
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      ".next/**",
+      "coverage/**",
+    ],
   },
   js.configs.recommended,${typescriptConfig}
   {
-    files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
+    files: ["**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}"],
     languageOptions: {
-      globals: globals.node,
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
     },
   },
 ];
@@ -66,21 +74,26 @@ export default [
 async function configurePrettier(projectDir, packageJson) {
     packageJson.devDependencies ??= {};
     packageJson.scripts ??= {};
-    packageJson.devDependencies["prettier"] ??= "^3.6.2";
+    packageJson.devDependencies.prettier ??= "latest";
     packageJson.devDependencies["@trivago/prettier-plugin-sort-imports"] ??=
-        "^5.2.2";
-    packageJson.devDependencies["prettier-plugin-tailwindcss"] ??= "^0.6.14";
-    packageJson.scripts.format ??=
-        'prettier --write "src/**/*.{js,jsx,ts,tsx,json,css,md}" "*.{js,jsx,ts,tsx,json,css,md}"';
-    packageJson.scripts["format:check"] ??=
-        'prettier --check "src/**/*.{js,jsx,ts,tsx,json,css,md}" "*.{js,jsx,ts,tsx,json,css,md}"';
-    const tsconfigPath = path.join(projectDir, "tsconfig.json");
-    if (await exists(tsconfigPath)) {
-        const tsconfig = await fs.readFile(tsconfigPath, "utf8");
-        await fs.writeFile(tsconfigPath, `${JSON.stringify(JSON.parse(tsconfig), null, 2)}\n`);
-    }
-    const prettierConfig = path.join(projectDir, ".prettierrc.json");
-    if (!(await exists(prettierConfig))) {
+        "latest";
+    packageJson.devDependencies["prettier-plugin-tailwindcss"] ??= "latest";
+    packageJson.scripts.format ??= "prettier --write .";
+    packageJson.scripts["format:check"] ??= "prettier --check .";
+    const prettierConfigs = [
+        ".prettierrc",
+        ".prettierrc.json",
+        ".prettierrc.yaml",
+        ".prettierrc.yml",
+        ".prettierrc.js",
+        ".prettierrc.cjs",
+        ".prettierrc.mjs",
+        "prettier.config.js",
+        "prettier.config.cjs",
+        "prettier.config.mjs",
+    ];
+    const hasConfig = (await Promise.all(prettierConfigs.map((file) => pathExists(path.join(projectDir, file))))).some(Boolean);
+    if (!hasConfig) {
         const config = {
             semi: true,
             trailingComma: "es5",
@@ -95,6 +108,7 @@ async function configurePrettier(projectDir, packageJson) {
                 "prettier-plugin-tailwindcss",
             ],
             importOrder: [
+                "^node:",
                 "^react",
                 "^next",
                 "<THIRD_PARTY_MODULES>",
@@ -107,62 +121,107 @@ async function configurePrettier(projectDir, packageJson) {
             importOrderGroupNamespaceSpecifiers: true,
             importOrderCaseInsensitive: true,
         };
-        await fs.writeFile(prettierConfig, `${JSON.stringify(config, null, 2)}\n`, {
-            flag: "wx",
-        });
+        await fs.writeFile(path.join(projectDir, ".prettierrc.json"), `${JSON.stringify(config, null, 2)}\n`, { flag: "wx" });
     }
     const ignoreFile = path.join(projectDir, ".prettierignore");
-    if (!(await exists(ignoreFile))) {
-        await fs.writeFile(ignoreFile, "node_modules\ndist\nbuild\n.next\ncoverage\ntsconfig.json\n", { flag: "wx" });
-    }
-}
-async function configureHusky(projectDir, packageJson, useCommitlint) {
-    packageJson.devDependencies ??= {};
-    packageJson.scripts ??= {};
-    packageJson.devDependencies["husky"] ??= "^9.1.7";
-    packageJson.scripts.prepare ??= "husky";
-    const huskyDir = path.join(projectDir, ".husky");
-    await fs.mkdir(huskyDir, { recursive: true });
-    const preCommitPath = path.join(huskyDir, "pre-commit");
-    if (!(await exists(preCommitPath))) {
-        const command = packageJson.scripts.lint
-            ? "npm run lint"
-            : "npm run format:check";
-        await fs.writeFile(preCommitPath, `${command}\n`, { flag: "wx" });
-    }
-    if (useCommitlint) {
-        const commitMsgPath = path.join(huskyDir, "commit-msg");
-        if (!(await exists(commitMsgPath))) {
-            await fs.writeFile(commitMsgPath, 'npx --no -- commitlint --edit "$1"\n', { flag: "wx" });
-        }
+    if (!(await pathExists(ignoreFile))) {
+        const ignoreRules = [
+            "node_modules",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+            ".git",
+            "package-lock.json",
+            "pnpm-lock.yaml",
+            "yarn.lock",
+            "bun.lock",
+            "bun.lockb",
+        ];
+        await fs.writeFile(ignoreFile, `${ignoreRules.join("\n")}\n`, {
+            flag: "wx",
+        });
     }
 }
 async function configureCommitlint(projectDir, packageJson) {
     packageJson.devDependencies ??= {};
-    packageJson.devDependencies["@commitlint/cli"] ??= "^19.8.0";
-    packageJson.devDependencies["@commitlint/config-conventional"] ??= "^19.8.0";
-    const configPath = path.join(projectDir, "commitlint.config.mjs");
-    if (!(await exists(configPath))) {
-        await fs.writeFile(configPath, `export default {
+    packageJson.scripts ??= {};
+    packageJson.devDependencies["@commitlint/cli"] ??= "latest";
+    packageJson.devDependencies["@commitlint/config-conventional"] ??= "latest";
+    packageJson.scripts.commitlint ??= "commitlint";
+    const configFiles = [
+        "commitlint.config.js",
+        "commitlint.config.mjs",
+        "commitlint.config.cjs",
+    ];
+    const hasConfig = (await Promise.all(configFiles.map((file) => pathExists(path.join(projectDir, file))))).some(Boolean);
+    if (!hasConfig) {
+        const config = `export default {
   extends: ["@commitlint/config-conventional"],
-};\n`, { flag: "wx" });
+};
+`;
+        await fs.writeFile(path.join(projectDir, "commitlint.config.mjs"), config, {
+            flag: "wx",
+        });
+    }
+}
+async function configureHusky(projectDir, packageJson, packageManager, useEslint, usePrettier, useCommitlint) {
+    packageJson.devDependencies ??= {};
+    packageJson.scripts ??= {};
+    packageJson.devDependencies.husky ??= "latest";
+    if (!packageJson.scripts.prepare) {
+        packageJson.scripts.prepare = "husky";
+    }
+    else if (!/\bhusky\b/.test(packageJson.scripts.prepare)) {
+        packageJson.scripts.prepare += " && husky";
+    }
+    const huskyDir = path.join(projectDir, ".husky");
+    await fs.mkdir(huskyDir, { recursive: true });
+    const preCommitCommands = [];
+    if (useEslint) {
+        preCommitCommands.push(getRunScriptCommand(packageManager, "lint"));
+    }
+    if (usePrettier) {
+        preCommitCommands.push(getRunScriptCommand(packageManager, "format:check"));
+    }
+    if (preCommitCommands.length > 0) {
+        const preCommitPath = path.join(huskyDir, "pre-commit");
+        if (!(await pathExists(preCommitPath))) {
+            await fs.writeFile(preCommitPath, `${preCommitCommands.join("\n")}\n`, {
+                flag: "wx",
+            });
+        }
+    }
+    if (useCommitlint) {
+        const commitMsgPath = path.join(huskyDir, "commit-msg");
+        if (!(await pathExists(commitMsgPath))) {
+            const command = getRunScriptCommand(packageManager, "commitlint", [
+                "--edit",
+                '"$1"',
+            ]);
+            await fs.writeFile(commitMsgPath, `${command}\n`, { flag: "wx" });
+        }
     }
 }
 export async function configureTools(config, projectDir) {
+    if (config.tools.length === 0)
+        return;
     const packageJson = await readPackageJson(projectDir);
-    if (config.tools.includes("eslint")) {
-        await configureEslint(projectDir, packageJson, config.typeScript);
-    }
-    if (config.tools.includes("prettier")) {
-        await configurePrettier(projectDir, packageJson);
-    }
+    const useEslint = config.tools.includes("eslint");
+    const usePrettier = config.tools.includes("prettier");
     const useCommitlint = config.tools.includes("commitlint");
     const useHusky = config.tools.includes("husky") || useCommitlint;
+    if (useEslint) {
+        await configureEslint(projectDir, packageJson, config.typeScript);
+    }
+    if (usePrettier) {
+        await configurePrettier(projectDir, packageJson);
+    }
     if (useCommitlint) {
         await configureCommitlint(projectDir, packageJson);
     }
     if (useHusky) {
-        await configureHusky(projectDir, packageJson, useCommitlint);
+        await configureHusky(projectDir, packageJson, config.packageManager, useEslint, usePrettier, useCommitlint);
     }
     await writePackageJson(projectDir, packageJson);
 }

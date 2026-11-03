@@ -1,17 +1,21 @@
-import type { FrameworkDefinition, FrameworkType } from "../types/framework.js";
+import type {
+  FrameworkCategory,
+  FrameworkDefinition,
+  FrameworkType,
+} from "../types/framework.js";
 
-export const frameworks = {
+export const frameworks: Record<FrameworkType, FrameworkDefinition> = {
   angular: {
     id: "angular",
     name: "Angular",
     category: "frontend",
     capabilities: {
       typescript: true,
-      javascript: true,
+      javascript: false,
       tailwind: true,
       shadcn: false,
-      database: true,
-      authProviders: ["better-auth", "clerk"],
+      database: false,
+      authProviders: [],
     },
   },
 
@@ -24,8 +28,8 @@ export const frameworks = {
       javascript: true,
       tailwind: true,
       shadcn: false,
-      database: true,
-      authProviders: ["better-auth", "clerk"],
+      database: false,
+      authProviders: [],
     },
   },
 
@@ -38,7 +42,7 @@ export const frameworks = {
       javascript: true,
       tailwind: true,
       shadcn: true,
-      database: true,
+      database: false,
       authProviders: ["better-auth", "clerk"],
     },
   },
@@ -53,7 +57,7 @@ export const frameworks = {
       tailwind: false,
       shadcn: false,
       database: true,
-      authProviders: ["better-auth", "clerk"],
+      authProviders: [],
     },
   },
 
@@ -81,7 +85,7 @@ export const frameworks = {
       tailwind: false,
       shadcn: false,
       database: true,
-      authProviders: ["better-auth", "clerk"],
+      authProviders: [],
     },
   },
 
@@ -95,7 +99,7 @@ export const frameworks = {
       tailwind: false,
       shadcn: false,
       database: true,
-      authProviders: ["better-auth", "clerk"],
+      authProviders: [],
     },
   },
 
@@ -109,25 +113,59 @@ export const frameworks = {
       tailwind: true,
       shadcn: true,
       database: true,
-      authProviders: ["better-auth", "clerk"],
+      authProviders: ["better-auth", "authjs", "clerk"],
     },
   },
-} satisfies Record<FrameworkType, FrameworkDefinition>;
+};
 
-export const getFramework = (id: FrameworkType) => {
-  return frameworks[id];
+export const getFramework = (id: FrameworkType): FrameworkDefinition => {
+  const framework = frameworks[id];
+  if (!framework) {
+    throw new Error(`Unknown framework: "${id}"`);
+  }
+  return framework;
+};
+
+export const isFrameworkSupported = (id: string): id is FrameworkType => {
+  return Object.prototype.hasOwnProperty.call(frameworks, id);
 };
 
 export const getFrameworksByCategory = (
-  category: FrameworkDefinition["category"]
-) => {
+  category: FrameworkCategory
+): FrameworkDefinition[] => {
   return Object.values(frameworks).filter(
     (framework) => framework.category === category
   );
 };
 
-export const getFrameworkChoices = () => {
-  return Object.values(frameworks).map((framework) => ({
+export const getCategories = (): {
+  name: string;
+  value: FrameworkCategory;
+  description: string;
+}[] => [
+  {
+    name: "Frontend",
+    value: "frontend",
+    description: "Client-side SPAs (Angular, Vue, React)",
+  },
+  {
+    name: "Backend",
+    value: "backend",
+    description:
+      "Server-side APIs & microservices (NestJS, Express, Fastify, Hono)",
+  },
+  {
+    name: "Full-stack",
+    value: "fullstack",
+    description: "Complete SSR & server action apps (Next.js)",
+  },
+];
+
+export const getFrameworkChoices = (category?: FrameworkCategory) => {
+  const list = category
+    ? getFrameworksByCategory(category)
+    : Object.values(frameworks);
+  return list.map((framework) => ({
     name: framework.name,
     value: framework.id,
   }));

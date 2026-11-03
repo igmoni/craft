@@ -16,4 +16,3 @@ registerGenerator("express", expressGenerator);
 registerGenerator("nestjs", nestjsGenerator);
 registerGenerator("fastify", fastifyGenerator);
 registerGenerator("hono", honoGenerator);
-

@@ -21,20 +21,19 @@ async function listEntries(root: string, current = root): Promise<Entry[]> {
   const result: Entry[] = [];
 
   for (const entry of entries) {
+    // Never copy or scan node_modules or .git during staging merge
+    if (entry.name === "node_modules" || entry.name === ".git") {
+      continue;
+    }
+
     const absolute = path.join(current, entry.name);
     const relativePath = path.relative(root, absolute);
-
-    if (entry.isSymbolicLink()) {
-      throw new Error(`Symbolic links are not supported: ${relativePath}`);
-    }
 
     if (entry.isDirectory()) {
       result.push({ relativePath, isDirectory: true });
       result.push(...(await listEntries(root, absolute)));
-    } else if (entry.isFile()) {
+    } else if (entry.isFile() || entry.isSymbolicLink()) {
       result.push({ relativePath, isDirectory: false });
-    } else {
-      throw new Error(`Unsupported filesystem entry: ${relativePath}`);
     }
   }
 
@@ -62,7 +61,8 @@ async function inspect(
 
 export async function mergeStagedFiles(
   stagingDir: string,
-  targetDir: string
+  targetDir: string,
+  allowExisting = false
 ): Promise<void> {
   const entries = await listEntries(stagingDir);
   const targetInfo = await inspect(targetDir);
@@ -71,16 +71,17 @@ export async function mergeStagedFiles(
     throw new Error(`Target is not a directory: ${targetDir}`);
   }
 
-  // Check every destination before copying any files.
-  for (const entry of entries) {
-    const destination = path.join(targetDir, entry.relativePath);
-    const info = await inspect(destination);
+  // Check destination before copying if allowExisting is false
+  if (!allowExisting) {
+    for (const entry of entries) {
+      const destination = path.join(targetDir, entry.relativePath);
+      const info = await inspect(destination);
 
-    if (!info.exists) continue;
+      if (!info.exists) continue;
+      if (entry.isDirectory && info.isDirectory) continue;
 
-    if (entry.isDirectory && info.isDirectory) continue;
-
-    throw new Error(`File conflict: ${entry.relativePath}`);
+      throw new Error(`File conflict: ${entry.relativePath}`);
+    }
   }
 
   const createdDirectories: string[] = [];
@@ -97,7 +98,7 @@ export async function mergeStagedFiles(
       const info = await inspect(destination);
 
       if (!info.exists) {
-        await fs.mkdir(destination);
+        await fs.mkdir(destination, { recursive: true });
         createdDirectories.push(destination);
       } else if (!info.isDirectory) {
         throw new Error(`Directory conflict: ${entry.relativePath}`);
@@ -118,11 +119,11 @@ export async function mergeStagedFiles(
         throw new Error(`Directory conflict: ${parentDir}`);
       }
 
-      await fs.copyFile(source, destination, constants.COPYFILE_EXCL);
+      await fs.copyFile(source, destination);
       createdFiles.push(destination);
     }
   } catch (error: unknown) {
-    // Roll back only files and directories created by this merge.
+    // Roll back files and directories created by this merge if it failed
     for (const file of createdFiles.reverse()) {
       await fs.rm(file, { force: true }).catch(() => {});
     }

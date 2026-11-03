@@ -1,157 +1,261 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-async function exists(filePath) {
-    try {
-        await fs.access(filePath);
-        return true;
-    }
-    catch {
-        return false;
-    }
-}
+import { pathExists } from "../utils/error.js";
 async function addEnvironmentVariable(filePath, key, value) {
-    const content = (await exists(filePath))
+    const content = (await pathExists(filePath))
         ? await fs.readFile(filePath, "utf8")
         : "";
     const hasKey = content
         .split(/\r?\n/)
         .some((line) => line.trimStart().startsWith(`${key}=`));
-    if (!hasKey) {
-        const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
-        await fs.writeFile(filePath, `${content}${separator}${key}=${value}\n`);
-    }
+    if (hasKey)
+        return;
+    const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
+    await fs.writeFile(filePath, `${content}${separator}${key}=${value}\n`);
 }
 async function addGitignoreRules(projectDir) {
     const filePath = path.join(projectDir, ".gitignore");
     const rules = [".env", ".env.*", "!.env.example"];
-    const content = (await exists(filePath))
+    const content = (await pathExists(filePath))
         ? await fs.readFile(filePath, "utf8")
         : "";
     const existing = new Set(content.split(/\r?\n/).map((line) => line.trim()));
     const missing = rules.filter((rule) => !existing.has(rule));
-    if (missing.length > 0) {
-        const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
-        await fs.writeFile(filePath, `${content}${separator}${missing.join("\n")}\n`);
-    }
+    if (missing.length === 0)
+        return;
+    const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
+    await fs.writeFile(filePath, `${content}${separator}${missing.join("\n")}\n`);
 }
-function getDatabaseSource(database, typeScript) {
-    if (database === "postgres") {
-        return typeScript
-            ? `import "dotenv/config";
-import pg from "pg";
+function getPrismaSchema() {
+    return `// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-const { Pool } = pg;
+generator client {
+  provider = "prisma-client-js"
+}
 
-export const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+`;
+}
+function getPrismaSource(typeScript) {
+    if (typeScript) {
+        return `import "dotenv/config";
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
 
 export async function checkDatabaseConnection(): Promise<void> {
-  const client = await db.connect();
-
-  try {
-    await client.query("SELECT 1");
-  } finally {
-    client.release();
-  }
+  await prisma.$connect();
 }
-`
-            : `import "dotenv/config";
-import pg from "pg";
 
-const { Pool } = pg;
-
-export const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-export async function checkDatabaseConnection() {
-  const client = await db.connect();
-
-  try {
-    await client.query("SELECT 1");
-  } finally {
-    client.release();
-  }
+export async function disconnectDatabase(): Promise<void> {
+  await prisma.$disconnect();
 }
 `;
     }
-    return typeScript
-        ? `import "dotenv/config";
+    return `import "dotenv/config";
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = globalThis;
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
+
+export async function checkDatabaseConnection() {
+  await prisma.$connect();
+}
+
+export async function disconnectDatabase() {
+  await prisma.$disconnect();
+}
+`;
+}
+function getMongooseSource(typeScript) {
+    if (typeScript) {
+        return `import "dotenv/config";
 import mongoose from "mongoose";
 
-export async function connectDatabase(): Promise<void> {
+interface MongooseCache {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var mongooseCache: MongooseCache | undefined;
+}
+
+const cached: MongooseCache = globalThis.mongooseCache ?? {
+  conn: null,
+  promise: null,
+};
+
+globalThis.mongooseCache = cached;
+
+export async function connectDatabase(): Promise<typeof mongoose> {
   const uri = process.env.MONGODB_URI;
 
   if (!uri) {
-    throw new Error("MONGODB_URI is not configured.");
+    throw new Error("MONGODB_URI is not defined in environment variables.");
   }
 
-  if (mongoose.connection.readyState === 1) {
-    return;
+  if (cached.conn) {
+    return cached.conn;
   }
 
-  await mongoose.connect(uri);
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+    };
+
+    cached.promise = mongoose.connect(uri, opts).then((m) => m);
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+
+  return cached.conn;
+}
+
+export async function disconnectDatabase(): Promise<void> {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
 }
 
 export { mongoose };
-`
-        : `import "dotenv/config";
+`;
+    }
+    return `import "dotenv/config";
 import mongoose from "mongoose";
+
+let cached = globalThis.mongooseCache;
+
+if (!cached) {
+  cached = globalThis.mongooseCache = { conn: null, promise: null };
+}
 
 export async function connectDatabase() {
   const uri = process.env.MONGODB_URI;
 
   if (!uri) {
-    throw new Error("MONGODB_URI is not configured.");
+    throw new Error("MONGODB_URI is not defined in environment variables.");
   }
 
-  if (mongoose.connection.readyState === 1) {
-    return;
+  if (cached.conn) {
+    return cached.conn;
   }
 
-  await mongoose.connect(uri);
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+    };
+
+    cached.promise = mongoose.connect(uri, opts).then((m) => m);
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+
+  return cached.conn;
+}
+
+export async function disconnectDatabase() {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
 }
 
 export { mongoose };
 `;
 }
-export async function configureDatabase(config, projectDir) {
-    if (config.database === "none") {
+async function writeFileIfMissing(filePath, content) {
+    if (await pathExists(filePath))
         return;
-    }
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, content, { flag: "wx" });
+}
+export async function configureDatabase(config, projectDir) {
+    if (config.database === "none")
+        return;
     const packagePath = path.join(projectDir, "package.json");
-    const packageJson = JSON.parse(await fs.readFile(packagePath, "utf8"));
-    packageJson.dependencies ??= {};
-    // Load environment variables consistently outside Next.js too.
-    packageJson.dependencies["dotenv"] ??= "^16.4.7";
-    if (config.database === "postgres") {
-        packageJson.dependencies["pg"] ??= "^8.16.3";
-        if (config.typeScript) {
-            packageJson.devDependencies ??= {};
-            packageJson.devDependencies["@types/pg"] ??= "^8.15.5";
-        }
-        await addEnvironmentVariable(path.join(projectDir, ".env.example"), "DATABASE_URL", "postgresql://postgres:password@localhost:5432/mydb");
+    let packageJson = {};
+    if (await pathExists(packagePath)) {
+        packageJson = JSON.parse(await fs.readFile(packagePath, "utf8"));
     }
-    else {
-        packageJson.dependencies["mongoose"] ??= "^8.18.0";
+    packageJson.dependencies ??= {};
+    packageJson.scripts ??= {};
+    packageJson.dependencies.dotenv ??= "latest";
+    if (config.database === "postgres") {
+        packageJson.dependencies["@prisma/client"] ??= "latest";
+        packageJson.devDependencies ??= {};
+        packageJson.devDependencies.prisma ??= "latest";
+        packageJson.scripts["db:generate"] ??= "prisma generate";
+        packageJson.scripts["db:migrate"] ??= "prisma migrate dev";
+        packageJson.scripts["db:deploy"] ??= "prisma migrate deploy";
+        packageJson.scripts["db:studio"] ??= "prisma studio";
+        await addEnvironmentVariable(path.join(projectDir, ".env.example"), "DATABASE_URL", "postgresql://postgres:password@localhost:5432/mydb?schema=public");
+        const prismaDirectory = path.join(projectDir, "prisma");
+        await fs.mkdir(prismaDirectory, { recursive: true });
+        await writeFileIfMissing(path.join(prismaDirectory, "schema.prisma"), getPrismaSchema());
+    }
+    else if (config.database === "mongodb") {
+        packageJson.dependencies.mongoose ??= "latest";
         await addEnvironmentVariable(path.join(projectDir, ".env.example"), "MONGODB_URI", "mongodb://127.0.0.1:27017/mydb");
     }
-    const sourceDirectory = config.framework === "vite"
-        ? "server"
-        : config.framework === "next"
-            ? (await exists(path.join(projectDir, "src")))
-                ? "src/lib"
-                : "lib"
-            : "src";
+    // Determine where to write the database client.
+    const hasSrcDir = await pathExists(path.join(projectDir, "src"));
+    let sourceDirectory;
+    if (config.framework === "next") {
+        sourceDirectory = hasSrcDir ? path.join("src", "lib") : "lib";
+    }
+    else {
+        sourceDirectory = "src";
+    }
     const databaseDirectory = path.join(projectDir, sourceDirectory);
     await fs.mkdir(databaseDirectory, { recursive: true });
     const extension = config.typeScript ? "ts" : "js";
-    const fileName = config.framework === "express" ? `db.${extension}` : `db.${extension}`;
-    const databaseFile = path.join(databaseDirectory, fileName);
-    if (!(await exists(databaseFile))) {
-        await fs.writeFile(databaseFile, getDatabaseSource(config.database, config.typeScript), { flag: "wx" });
-    }
+    const databaseFile = path.join(databaseDirectory, `db.${extension}`);
+    const databaseSource = config.database === "postgres"
+        ? getPrismaSource(config.typeScript)
+        : getMongooseSource(config.typeScript);
+    await writeFileIfMissing(databaseFile, databaseSource);
     await addGitignoreRules(projectDir);
     await fs.writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
 }

@@ -1,76 +1,81 @@
 import { checkbox, confirm, input, select } from "@inquirer/prompts";
 
-import { getFramework } from "../../core/registry/framework.js";
+import {
+  normalizeProjectName,
+  validateExistingConfig,
+  validateProjectName,
+} from "../../core/engine/validate.js";
+import {
+  getCategories,
+  getFramework,
+  getFrameworkChoices,
+} from "../../core/registry/framework.js";
 import type {
+  AuthProvider,
   DatabaseType,
+  FrameworkCategory,
   GeneratorOptions,
+  PackageManager,
   PartialProjectConfig,
   ToolType,
 } from "../../core/types/config.js";
-import type { AuthProvider } from "../../core/types/config.js";
+import type { FrameworkType } from "../../core/types/framework.js";
 
-const authProviders: Record<
-  AuthProvider,
-  Partial<Record<GeneratorOptions["framework"], string>>
-> = {
-  "better-auth": {
-    next: "Better Auth",
-    react: "Better Auth",
-    express: "Better Auth",
-  },
-  authjs: {
-    next: "Auth.js",
-  },
-  clerk: {
-    next: "Clerk",
-    react: "Clerk",
-    express: "Clerk",
-  },
+const authProviderNames: Record<AuthProvider, string> = {
+  "better-auth": "Better Auth",
+  authjs: "Auth.js",
+  clerk: "Clerk",
 };
 
 export const promptProjectConfig = async (
   existing: PartialProjectConfig = {}
 ): Promise<GeneratorOptions> => {
-  const projectName =
+  // Step 1: Project name
+  const rawProjectName =
     existing.projectName ??
-    (
-      await input({
-        message: "What is your project name?",
-        validate: (value) => {
-          const name = value.trim();
-
-          if (!name) return "Project name is required.";
-
-          if (!/^[a-zA-Z0-9-_]+$/.test(name)) {
-            return "Use only letters, numbers, hyphens, and underscores.";
-          }
-
-          return true;
-        },
-      })
-    )
-      .trim()
-      .toLowerCase();
-
-  const framework =
-    existing.framework ??
-    (await select({
-      message: "Choose a framework",
-      choices: [
-        { name: "Angular", value: "angular" },
-        { name: "Vue", value: "vue" },
-        { name: "React (Vite)", value: "react" },
-        { name: "NestJS", value: "nestjs" },
-        { name: "Express", value: "express" },
-        { name: "Fastify", value: "fastify" },
-        { name: "Hono", value: "hono" },
-        { name: "Next.js", value: "next" },
-      ],
+    (await input({
+      message: "What is your project name?",
+      default: "my-app",
+      validate: validateProjectName,
     }));
+
+  const projectName = normalizeProjectName(rawProjectName);
+  const nameValidation = validateProjectName(projectName);
+  if (nameValidation !== true) {
+    throw new Error(nameValidation);
+  }
+
+  // Step 2 & 3: Framework (Category + Framework)
+  let framework: FrameworkType;
+
+  if (existing.framework) {
+    framework = existing.framework;
+  } else {
+    const category = await select<FrameworkCategory>({
+      message: "Select project category",
+      choices: getCategories().map((cat) => ({
+        name: `${cat.name.padEnd(12)} - ${cat.description}`,
+        value: cat.value,
+      })),
+      default: "fullstack",
+    });
+
+    framework = await select<FrameworkType>({
+      message: "Choose a framework",
+      choices: getFrameworkChoices(category).map((f) => ({
+        name: f.name,
+        value: f.value,
+      })),
+    });
+  }
 
   const frameworkInfo = getFramework(framework);
   const capabilities = frameworkInfo.capabilities;
 
+  // Validate any existing flags before prompting remaining questions
+  validateExistingConfig(existing, framework);
+
+  // Step 4: Language (TypeScript vs JavaScript)
   let typeScript: boolean;
 
   if (existing.typeScript !== undefined) {
@@ -81,81 +86,98 @@ export const promptProjectConfig = async (
       default: true,
     });
   } else {
+    // Only one language supported (e.g. Angular is TypeScript only)
     typeScript = capabilities.typescript;
   }
 
+  // Step 5: Database (only if supported by framework)
   let database: DatabaseType = "none";
 
   if (capabilities.database) {
-    database =
-      existing.database ??
-      (await select({
+    if (existing.database !== undefined) {
+      database = existing.database;
+    } else {
+      database = await select<DatabaseType>({
         message: "Choose a database",
         choices: [
-          { name: "PostgreSQL", value: "postgres" },
-          { name: "MongoDB", value: "mongodb" },
+          { name: "PostgreSQL (Prisma)", value: "postgres" },
+          { name: "MongoDB (Mongoose)", value: "mongodb" },
           { name: "None", value: "none" },
         ],
-      }));
-  } else if (existing.database !== undefined && existing.database !== "none") {
-    throw new Error(
-      `${frameworkInfo.name} does not support Craft database integration.`
-    );
-  }
-
-  const availableAuthProviders = capabilities.authProviders;
-
-  let auth: GeneratorOptions["auth"] = false;
-
-  if (availableAuthProviders.length > 0) {
-    const wantsAuth =
-      existing.auth !== undefined
-        ? existing.auth !== false
-        : await confirm({
-            message: "Add authentication?",
-            default: false,
-          });
-
-    if (wantsAuth) {
-      auth =
-        existing.auth !== undefined
-          ? existing.auth
-          : await select({
-              message: "Choose an authentication provider",
-              choices: availableAuthProviders.map((provider) => ({
-                name: provider,
-                value: provider,
-              })),
-            });
+        default: "none",
+      });
     }
   }
 
-  const uiLibrary = capabilities.shadcn
-    ? existing.uiLibrary !== undefined
-      ? existing.uiLibrary
-      : (await confirm({
-            message: "Add shadcn/ui?",
-            default: false,
-          }))
-        ? "shadcn"
-        : false
-    : false;
+  // Step 6: Authentication (only if supported by framework)
+  let auth: GeneratorOptions["auth"] = false;
 
-  const tools: ToolType[] =
-    existing.tools ??
-    (await checkbox({
-      message: "Which tools do you want?",
+  const availableAuthProviders = capabilities.authProviders;
+
+  if (availableAuthProviders.length > 0) {
+    if (existing.auth !== undefined) {
+      auth = existing.auth;
+    } else {
+      const wantsAuth = await confirm({
+        message: "Add authentication?",
+        default: false,
+      });
+
+      if (wantsAuth) {
+        if (availableAuthProviders.length === 1) {
+          auth = availableAuthProviders[0];
+        } else {
+          auth = await select<AuthProvider>({
+            message: "Choose an authentication provider",
+            choices: availableAuthProviders.map((provider) => ({
+              name: authProviderNames[provider] ?? provider,
+              value: provider,
+            })),
+          });
+        }
+      }
+    }
+  }
+
+  // Step 7: UI Library (only if supported by framework)
+  let uiLibrary: GeneratorOptions["uiLibrary"] = false;
+
+  if (capabilities.shadcn) {
+    if (existing.uiLibrary !== undefined) {
+      uiLibrary = existing.uiLibrary;
+    } else {
+      const wantsShadcn = await confirm({
+        message: "Add shadcn/ui?",
+        default: false,
+      });
+      uiLibrary = wantsShadcn ? "shadcn" : false;
+    }
+  }
+
+  // Step 8: Development Tools
+  let tools: ToolType[];
+
+  if (existing.tools !== undefined) {
+    tools = existing.tools;
+  } else {
+    tools = await checkbox<ToolType>({
+      message: "Which development tools do you want?",
       choices: [
         { name: "ESLint", value: "eslint", checked: true },
         { name: "Prettier", value: "prettier", checked: true },
-        { name: "Husky", value: "husky" },
-        { name: "Commitlint", value: "commitlint" },
+        { name: "Husky (Git hooks)", value: "husky" },
+        { name: "Commitlint (Conventional commits)", value: "commitlint" },
       ],
-    }));
+    });
+  }
 
-  const packageManager =
-    existing.packageManager ??
-    (await select({
+  // Step 9: Package Manager
+  let packageManager: PackageManager;
+
+  if (existing.packageManager !== undefined) {
+    packageManager = existing.packageManager;
+  } else {
+    packageManager = await select<PackageManager>({
       message: "Choose a package manager",
       choices: [
         { name: "npm", value: "npm" },
@@ -164,7 +186,8 @@ export const promptProjectConfig = async (
         { name: "Bun", value: "bun" },
       ],
       default: "npm",
-    }));
+    });
+  }
 
   return {
     projectName,

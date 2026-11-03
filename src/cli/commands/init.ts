@@ -1,12 +1,16 @@
 import { Command, Option } from "commander";
 
+import { generateProject } from "../../core/engine/generate.js";
+import { validateExistingConfig } from "../../core/engine/validate.js";
+import { getFramework } from "../../core/registry/framework.js";
 import type {
   AuthProvider,
   PartialProjectConfig,
   ToolType,
 } from "../../core/types/config.js";
-import { generateProject } from "../../generators/project.js";
 import { promptProjectConfig } from "../prompts/project.js";
+import { displayBanner } from "../ui/banner.js";
+import { logger } from "../ui/logger.js";
 
 const supportedTools: ToolType[] = [
   "eslint",
@@ -15,10 +19,10 @@ const supportedTools: ToolType[] = [
   "commitlint",
 ];
 
-const parseTools = (value: string): ToolType[] => {
+export const parseTools = (value: string): ToolType[] => {
   const tools = value
     .split(/[,\s]+/)
-    .map((tool) => tool.trim())
+    .map((tool) => tool.trim().toLowerCase())
     .filter(Boolean);
 
   const invalidTools = tools.filter(
@@ -26,13 +30,15 @@ const parseTools = (value: string): ToolType[] => {
   );
 
   if (invalidTools.length > 0) {
-    throw new Error(`Unknown tools: ${invalidTools.join(", ")}`);
+    throw new Error(
+      `Unknown tools: ${invalidTools.join(", ")}. Supported tools: ${supportedTools.join(", ")}`
+    );
   }
 
   return [...new Set(tools)] as ToolType[];
 };
 
-const getProvidedOptions = (command: Command): PartialProjectConfig => {
+export const getProvidedOptions = (command: Command): PartialProjectConfig => {
   const options = command.opts();
   const config: PartialProjectConfig = {};
 
@@ -45,7 +51,11 @@ const getProvidedOptions = (command: Command): PartialProjectConfig => {
   }
 
   if (command.getOptionValueSource("auth") === "cli") {
-    config.auth = options.auth as AuthProvider;
+    if (options.auth === "none") {
+      config.auth = false;
+    } else {
+      config.auth = options.auth as AuthProvider;
+    }
   }
 
   if (command.getOptionValueSource("tools") === "cli") {
@@ -65,8 +75,8 @@ const getProvidedOptions = (command: Command): PartialProjectConfig => {
 
 export const registerInitCommand = (program: Command): void => {
   const init = program
-    .command("init [projectName]")
-    .description("Create a new project");
+    .command("init [projectName]", { isDefault: true })
+    .description("Scaffold a new project with Craft");
 
   init.addOption(
     new Option("-f, --framework <framework>", "Choose a framework").choices([
@@ -97,10 +107,12 @@ export const registerInitCommand = (program: Command): void => {
       "better-auth",
       "authjs",
       "clerk",
+      "none",
     ])
   );
 
   init.addOption(new Option("--shadcn", "Add shadcn/ui integration"));
+  init.addOption(new Option("--no-shadcn", "Skip shadcn/ui integration"));
 
   init.addOption(
     new Option(
@@ -121,14 +133,11 @@ export const registerInitCommand = (program: Command): void => {
     `
 Examples:
   $ craft init my-app
-  $ craft init my-app --framework next
-  $ craft init my-app --framework angular --ts
-  $ craft init my-app --framework react --database postgres
-  $ craft init my-api --framework express --database mongodb
-  $ craft init my-app --auth better-auth
-  $ craft init my-app --shadcn
-  $ craft init my-app --tools eslint,prettier
-  $ craft init my-app --package-manager pnpm
+  $ craft init my-app --framework next --ts
+  $ craft init my-app --framework react --ts --shadcn --package-manager pnpm
+  $ craft init my-api --framework express --database postgres --ts
+  $ craft init my-api --framework hono --ts --tools eslint,prettier
+  $ craft init my-app --framework next --database postgres --auth better-auth --shadcn
 `
   );
 
@@ -139,6 +148,8 @@ Examples:
       command: Command
     ): Promise<void> => {
       try {
+        displayBanner();
+
         const providedConfig = getProvidedOptions(command);
 
         if (projectName) {
@@ -157,8 +168,12 @@ Examples:
           providedConfig.typeScript = false;
         }
 
-        const config = await promptProjectConfig(providedConfig);
+        // If framework was provided via CLI, validate combinations immediately
+        if (providedConfig.framework) {
+          validateExistingConfig(providedConfig, providedConfig.framework);
+        }
 
+        const config = await promptProjectConfig(providedConfig);
         await generateProject(config);
       } catch (error: unknown) {
         const message =
@@ -166,7 +181,7 @@ Examples:
             ? error.message
             : "An unexpected error occurred.";
 
-        console.error(`\nError: ${message}`);
+        logger.error(message);
         process.exitCode = 1;
       }
     }

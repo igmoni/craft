@@ -13,7 +13,7 @@ export async function pathExists(targetPath: string): Promise<boolean> {
       typeof error === "object" &&
       error !== null &&
       "code" in error &&
-      error.code === "ENOENT"
+      (error as { code: string }).code === "ENOENT"
     ) {
       return false;
     }

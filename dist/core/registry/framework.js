@@ -8,6 +8,8 @@ export const frameworks = {
             javascript: false,
             tailwind: true,
             shadcn: false,
+            database: false,
+            authProviders: [],
         },
     },
     vue: {
@@ -19,6 +21,8 @@ export const frameworks = {
             javascript: true,
             tailwind: true,
             shadcn: false,
+            database: false,
+            authProviders: [],
         },
     },
     react: {
@@ -30,6 +34,8 @@ export const frameworks = {
             javascript: true,
             tailwind: true,
             shadcn: true,
+            database: false,
+            authProviders: ["better-auth", "clerk"],
         },
     },
     nestjs: {
@@ -41,6 +47,8 @@ export const frameworks = {
             javascript: true,
             tailwind: false,
             shadcn: false,
+            database: true,
+            authProviders: [],
         },
     },
     express: {
@@ -52,6 +60,8 @@ export const frameworks = {
             javascript: true,
             tailwind: false,
             shadcn: false,
+            database: true,
+            authProviders: ["better-auth", "clerk"],
         },
     },
     fastify: {
@@ -63,6 +73,8 @@ export const frameworks = {
             javascript: true,
             tailwind: false,
             shadcn: false,
+            database: true,
+            authProviders: [],
         },
     },
     hono: {
@@ -74,6 +86,8 @@ export const frameworks = {
             javascript: true,
             tailwind: false,
             shadcn: false,
+            database: true,
+            authProviders: [],
         },
     },
     next: {
@@ -85,17 +99,46 @@ export const frameworks = {
             javascript: true,
             tailwind: true,
             shadcn: true,
+            database: true,
+            authProviders: ["better-auth", "authjs", "clerk"],
         },
     },
 };
 export const getFramework = (id) => {
-    return frameworks[id];
+    const framework = frameworks[id];
+    if (!framework) {
+        throw new Error(`Unknown framework: "${id}"`);
+    }
+    return framework;
+};
+export const isFrameworkSupported = (id) => {
+    return Object.prototype.hasOwnProperty.call(frameworks, id);
 };
 export const getFrameworksByCategory = (category) => {
     return Object.values(frameworks).filter((framework) => framework.category === category);
 };
-export const getFrameworkChoices = () => {
-    return Object.values(frameworks).map((framework) => ({
+export const getCategories = () => [
+    {
+        name: "Frontend",
+        value: "frontend",
+        description: "Client-side SPAs (Angular, Vue, React)",
+    },
+    {
+        name: "Backend",
+        value: "backend",
+        description: "Server-side APIs & microservices (NestJS, Express, Fastify, Hono)",
+    },
+    {
+        name: "Full-stack",
+        value: "fullstack",
+        description: "Complete SSR & server action apps (Next.js)",
+    },
+];
+export const getFrameworkChoices = (category) => {
+    const list = category
+        ? getFrameworksByCategory(category)
+        : Object.values(frameworks);
+    return list.map((framework) => ({
         name: framework.name,
         value: framework.id,
     }));

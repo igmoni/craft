@@ -18,7 +18,7 @@ export interface FrameworkCapabilities {
   tailwind: boolean;
   shadcn: boolean;
   database: boolean;
-  authProviders: AuthProvider[]
+  authProviders: AuthProvider[];
 }
 
 export interface FrameworkDefinition {

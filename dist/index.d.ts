@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-export {};
+import "./core/registry/register-generators.js";

@@ -21,51 +21,72 @@ export const expressGenerator: FrameworkGenerator = {
         start: isTS ? "node dist/index.js" : "node src/index.js",
       },
       dependencies: {
-        express: "^5.1.0",
+        express: "latest",
       },
       ...(isTS && {
         devDependencies: {
-          "@types/express": "^5.0.0",
-          "@types/node": "^22.0.0",
-          tsx: "^4.20.0",
-          typescript: "^5.0.0",
+          "@types/express": "latest",
+          "@types/node": "latest",
+          tsx: "latest",
+          typescript: "latest",
         },
       }),
     };
 
+    // Database imports and hooks
     let databaseImport = "";
     let databaseStartup = "";
+    let databaseClose = "";
 
     if (options.database === "postgres") {
       databaseImport =
         'import { checkDatabaseConnection, disconnectDatabase } from "./db.js";';
-
       databaseStartup = `
     await checkDatabaseConnection();
-    console.log("PostgreSQL connected.");`;
+    console.log("PostgreSQL connected via Prisma.");`;
+      databaseClose = "\n    await disconnectDatabase();";
     } else if (options.database === "mongodb") {
-      databaseImport = 'import { connectDatabase, mongoose } from "./db.js";';
-
+      databaseImport =
+        'import { connectDatabase, disconnectDatabase } from "./db.js";';
       databaseStartup = `
     await connectDatabase();
-    console.log("MongoDB connected.");`;
+    console.log("MongoDB connected via Mongoose.");`;
+      databaseClose = "\n    await disconnectDatabase();";
     }
 
-    const databaseClose =
-      options.database === "postgres"
-        ? "\n    await disconnectDatabase();"
-        : options.database === "mongodb"
-          ? "\n    await mongoose.disconnect();"
-          : "";
+    // Auth imports and middlewares
+    let authImport = "";
+    let authPreMiddleware = "";
+    let authPostMiddleware = "";
 
-    const source = `${databaseImport}
+    if (options.auth === "better-auth") {
+      authImport = `import { toNodeHandler } from "better-auth/node";
+import { auth } from "./auth.js";`;
+      // Express middleware ordering: Better Auth must be mounted before express.json()
+      authPreMiddleware = `
+// Mount Better Auth handler before express.json()
+app.all("/api/auth/*", toNodeHandler(auth));`;
+    } else if (options.auth === "clerk") {
+      authImport = 'import { clerkMiddleware } from "@clerk/express";';
+      authPostMiddleware = `
+// Clerk authentication middleware
+app.use(clerkMiddleware());`;
+    }
 
-import express from "express";
+    const imports = [
+      databaseImport,
+      authImport,
+      'import express from "express";',
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const source = `${imports}
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
-
-app.use(express.json());
+${authPreMiddleware}
+app.use(express.json());${authPostMiddleware}
 
 app.get("/", (_req, res) => {
   res.json({ message: "Craft Express API is running" });
@@ -75,6 +96,7 @@ app.get("/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
     database: ${JSON.stringify(options.database)},
+    auth: ${JSON.stringify(options.auth || "none")},
   });
 });
 
@@ -90,7 +112,7 @@ async function startServer() {
         try {${databaseClose}
           process.exit(0);
         } catch (error) {
-          console.error("Error closing database:", error);
+          console.error("Error during graceful shutdown:", error);
           process.exit(1);
         }
       });

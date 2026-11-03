@@ -1,1 +1,1 @@
-export declare function generateEnvFile(projectDir: string): Promise<void>;
+export declare function generateEnvFile(projectDir: string): Promise<boolean>;

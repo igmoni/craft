@@ -1,2 +1,2 @@
-import type { GenerateProjectConfig } from "../../types/utils.js";
-export declare function generateExpressProject(config: GenerateProjectConfig, targetDir: string): Promise<void>;
+import type { FrameworkGenerator } from "../../core/types/generator.js";
+export declare const expressGenerator: FrameworkGenerator;

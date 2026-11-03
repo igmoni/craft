@@ -1,51 +1,20 @@
 import path from "node:path";
 
-import type { PackageManager } from "../../core/types/config.js";
 import type { FrameworkGenerator } from "../../core/types/generator.js";
+import { getDlxCommand } from "../../services/packageManager.js";
 import { runCommand } from "../../services/runCommand.js";
-
-interface PackageManagerCommand {
-  command: string;
-  prefix: string[];
-}
-
-const packageManagerCommands: Record<PackageManager, PackageManagerCommand> = {
-  npm: {
-    command: "npm",
-    prefix: ["create", "vite@latest"],
-  },
-  pnpm: {
-    command: "pnpm",
-    prefix: ["create", "vite@latest"],
-  },
-  yarn: {
-    command: "yarn",
-    prefix: ["create", "vite"],
-  },
-  bun: {
-    command: "bun",
-    prefix: ["create", "vite@latest"],
-  },
-};
 
 export const vueGenerator: FrameworkGenerator = {
   async generate(options) {
     const projectDirectory = path.basename(options.targetDir);
-    const { command, prefix } = packageManagerCommands[options.packageManager];
+    const template = options.typeScript ? "vue-ts" : "vue";
 
-    const args = [...prefix, projectDirectory];
-
-    if (options.packageManager === "npm") {
-      args.push("--");
-    }
-
-    args.push(
+    const dlx = getDlxCommand(options.packageManager, "create-vite@latest", [
+      projectDirectory,
       "--template",
-      options.typeScript ? "vue-ts" : "vue",
-      "--no-interactive",
-      "--no-immediate"
-    );
+      template,
+    ]);
 
-    await runCommand(command, args, path.dirname(options.targetDir));
+    await runCommand(dlx.command, dlx.args, path.dirname(options.targetDir));
   },
 };

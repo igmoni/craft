@@ -1,70 +1,98 @@
 import { Command, Option } from "commander";
-import { generateProject } from "../../generators/project.js";
+import { generateProject } from "../../core/engine/generate.js";
+import { validateExistingConfig } from "../../core/engine/validate.js";
+import { getFramework } from "../../core/registry/framework.js";
 import { promptProjectConfig } from "../prompts/project.js";
+import { displayBanner } from "../ui/banner.js";
+import { logger } from "../ui/logger.js";
 const supportedTools = [
     "eslint",
     "prettier",
     "husky",
     "commitlint",
 ];
-const parseTools = (value) => {
+export const parseTools = (value) => {
     const tools = value
         .split(/[,\s]+/)
-        .map((tool) => tool.trim())
+        .map((tool) => tool.trim().toLowerCase())
         .filter(Boolean);
     const invalidTools = tools.filter((tool) => !supportedTools.includes(tool));
     if (invalidTools.length > 0) {
-        throw new Error(`Unknown tools: ${invalidTools.join(", ")}`);
+        throw new Error(`Unknown tools: ${invalidTools.join(", ")}. Supported tools: ${supportedTools.join(", ")}`);
     }
     return [...new Set(tools)];
 };
-const getProvidedOptions = (command) => {
+export const getProvidedOptions = (command) => {
     const options = command.opts();
     const config = {};
     if (command.getOptionValueSource("framework") === "cli") {
         config.framework = options.framework;
     }
-    if (command.getOptionValueSource("typeScript") === "cli") {
-        config.typeScript = options.typeScript;
-    }
     if (command.getOptionValueSource("database") === "cli") {
         config.database = options.database;
     }
     if (command.getOptionValueSource("auth") === "cli") {
-        config.auth = options.auth;
+        if (options.auth === "none") {
+            config.auth = false;
+        }
+        else {
+            config.auth = options.auth;
+        }
     }
     if (command.getOptionValueSource("tools") === "cli") {
         config.tools = options.tools;
+    }
+    if (command.getOptionValueSource("packageManager") === "cli") {
+        config.packageManager = options.packageManager;
+    }
+    if (command.getOptionValueSource("shadcn") === "cli") {
+        config.uiLibrary = options.shadcn ? "shadcn" : false;
     }
     return config;
 };
 export const registerInitCommand = (program) => {
     const init = program
-        .command("init [projectName]")
-        .description("Create a new project");
-    init.addOption(new Option("-f, --framework <framework>", "Choose a framework")
-        .choices(["next", "vite", "express"])
-        .default("next"));
-    init.addOption(new Option("--ts", "Use TypeScript").default(undefined));
-    init.addOption(new Option("--js", "Use JavaScript").default(undefined));
-    init.addOption(new Option("-d, --database <database>", "Choose a database")
-        .choices(["postgres", "mongodb", "none"])
-        .default("none"));
-    init.addOption(new Option("--auth [provider]", "Configure authentication")
-        .choices(["better-auth", "authjs", "clerk"])
-        .default(false));
+        .command("init [projectName]", { isDefault: true })
+        .description("Scaffold a new project with Craft");
+    init.addOption(new Option("-f, --framework <framework>", "Choose a framework").choices([
+        "angular",
+        "vue",
+        "react",
+        "nestjs",
+        "express",
+        "fastify",
+        "hono",
+        "next",
+    ]));
+    init.addOption(new Option("--ts", "Use TypeScript"));
+    init.addOption(new Option("--js", "Use JavaScript"));
+    init.addOption(new Option("-d, --database <database>", "Choose a database").choices([
+        "postgres",
+        "mongodb",
+        "none",
+    ]));
+    init.addOption(new Option("--auth <provider>", "Configure authentication").choices([
+        "better-auth",
+        "authjs",
+        "clerk",
+        "none",
+    ]));
+    init.addOption(new Option("--shadcn", "Add shadcn/ui integration"));
+    init.addOption(new Option("--no-shadcn", "Skip shadcn/ui integration"));
     init.addOption(new Option("-t, --tools <tools>", "Comma-separated tools: eslint, prettier, husky, commitlint").argParser(parseTools));
+    init.addOption(new Option("-p, --package-manager <manager>", "Choose a package manager").choices(["npm", "pnpm", "yarn", "bun"]));
     init.addHelpText("after", `
 Examples:
   $ craft init my-app
-  $ craft init my-app --framework next
-  $ craft init my-app --framework vite --database postgres
-  $ craft init my-api --framework express --database mongodb
-  $ craft init my-app --auth better-auth
-  $ craft init my-app --tools eslint,prettier
+  $ craft init my-app --framework next --ts
+  $ craft init my-app --framework react --ts --shadcn --package-manager pnpm
+  $ craft init my-api --framework express --database postgres --ts
+  $ craft init my-api --framework hono --ts --tools eslint,prettier
+  $ craft init my-app --framework next --database postgres --auth better-auth --shadcn
 `);
     init.action(async (projectName, _options, command) => {
         try {
+            displayBanner();
             const providedConfig = getProvidedOptions(command);
             if (projectName) {
                 providedConfig.projectName = projectName;
@@ -79,6 +107,10 @@ Examples:
             else if (options.js) {
                 providedConfig.typeScript = false;
             }
+            // If framework was provided via CLI, validate combinations immediately
+            if (providedConfig.framework) {
+                validateExistingConfig(providedConfig, providedConfig.framework);
+            }
             const config = await promptProjectConfig(providedConfig);
             await generateProject(config);
         }
@@ -86,7 +118,7 @@ Examples:
             const message = error instanceof Error
                 ? error.message
                 : "An unexpected error occurred.";
-            console.error(`\nError: ${message}`);
+            logger.error(message);
             process.exitCode = 1;
         }
     });

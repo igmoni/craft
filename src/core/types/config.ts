@@ -1,4 +1,8 @@
-import type { AuthProvider, FrameworkType } from "./framework.js";
+import type {
+  AuthProvider,
+  FrameworkCategory,
+  FrameworkType,
+} from "./framework.js";
 
 export type DatabaseType = "postgres" | "mongodb" | "none";
 
@@ -27,4 +31,8 @@ export interface GeneratorOptions extends GenerateProjectConfig {}
 
 export type PartialProjectConfig = Partial<GeneratorOptions>;
 
-export type { AuthProvider } from "./framework.js";
+export type {
+  AuthProvider,
+  FrameworkCategory,
+  FrameworkType,
+} from "./framework.js";

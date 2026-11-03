@@ -1,24 +1,31 @@
 import path from "node:path";
+import { getDlxCommand } from "../../services/packageManager.js";
 import { runCommand } from "../../services/runCommand.js";
-export async function generateNextProject(config, targetDir) {
-    const args = [
-        "create-next-app@latest",
-        targetDir,
-        "--yes",
-        config.typeScript ? "--ts" : "--js",
-        "--use-npm",
-        "--skip-install",
-        "--src-dir",
-        "--app",
-        "--disable-git",
-        "--tailwind",
-    ];
-    if (config.tools.includes("eslint")) {
-        args.push("--eslint");
-    }
-    else {
-        args.push("--no-linter");
-    }
-    await runCommand("npx", args, path.dirname(targetDir));
-}
+export const nextGenerator = {
+    async generate(options) {
+        const projectDirectory = path.basename(options.targetDir);
+        const pmFlag = options.packageManager === "pnpm"
+            ? "--use-pnpm"
+            : options.packageManager === "yarn"
+                ? "--use-yarn"
+                : options.packageManager === "bun"
+                    ? "--use-bun"
+                    : "--use-npm";
+        const dlx = getDlxCommand(options.packageManager, "create-next-app@latest", [
+            projectDirectory,
+            options.typeScript ? "--ts" : "--js",
+            "--tailwind",
+            "--app",
+            "--src-dir",
+            "--import-alias",
+            "@/*",
+            pmFlag,
+            "--yes",
+            "--disable-git",
+            "--skip-install",
+            options.tools.includes("eslint") ? "--eslint" : "--no-eslint",
+        ]);
+        await runCommand(dlx.command, dlx.args, path.dirname(options.targetDir));
+    },
+};
 //# sourceMappingURL=next.js.map

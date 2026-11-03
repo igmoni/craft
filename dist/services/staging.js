@@ -12,20 +12,18 @@ async function listEntries(root, current = root) {
     const entries = await fs.readdir(current, { withFileTypes: true });
     const result = [];
     for (const entry of entries) {
+        // Never copy or scan node_modules or .git during staging merge
+        if (entry.name === "node_modules" || entry.name === ".git") {
+            continue;
+        }
         const absolute = path.join(current, entry.name);
         const relativePath = path.relative(root, absolute);
-        if (entry.isSymbolicLink()) {
-            throw new Error(`Symbolic links are not supported: ${relativePath}`);
-        }
         if (entry.isDirectory()) {
             result.push({ relativePath, isDirectory: true });
             result.push(...(await listEntries(root, absolute)));
         }
-        else if (entry.isFile()) {
+        else if (entry.isFile() || entry.isSymbolicLink()) {
             result.push({ relativePath, isDirectory: false });
-        }
-        else {
-            throw new Error(`Unsupported filesystem entry: ${relativePath}`);
         }
     }
     return result;
@@ -45,21 +43,23 @@ async function inspect(target) {
         throw error;
     }
 }
-export async function mergeStagedFiles(stagingDir, targetDir) {
+export async function mergeStagedFiles(stagingDir, targetDir, allowExisting = false) {
     const entries = await listEntries(stagingDir);
     const targetInfo = await inspect(targetDir);
     if (targetInfo.exists && !targetInfo.isDirectory) {
         throw new Error(`Target is not a directory: ${targetDir}`);
     }
-    // Check every destination before copying any files.
-    for (const entry of entries) {
-        const destination = path.join(targetDir, entry.relativePath);
-        const info = await inspect(destination);
-        if (!info.exists)
-            continue;
-        if (entry.isDirectory && info.isDirectory)
-            continue;
-        throw new Error(`File conflict: ${entry.relativePath}`);
+    // Check destination before copying if allowExisting is false
+    if (!allowExisting) {
+        for (const entry of entries) {
+            const destination = path.join(targetDir, entry.relativePath);
+            const info = await inspect(destination);
+            if (!info.exists)
+                continue;
+            if (entry.isDirectory && info.isDirectory)
+                continue;
+            throw new Error(`File conflict: ${entry.relativePath}`);
+        }
     }
     const createdDirectories = [];
     const createdFiles = [];
@@ -72,7 +72,7 @@ export async function mergeStagedFiles(stagingDir, targetDir) {
             const destination = path.join(targetDir, entry.relativePath);
             const info = await inspect(destination);
             if (!info.exists) {
-                await fs.mkdir(destination);
+                await fs.mkdir(destination, { recursive: true });
                 createdDirectories.push(destination);
             }
             else if (!info.isDirectory) {
@@ -91,12 +91,12 @@ export async function mergeStagedFiles(stagingDir, targetDir) {
             else if (!parentInfo.isDirectory) {
                 throw new Error(`Directory conflict: ${parentDir}`);
             }
-            await fs.copyFile(source, destination, constants.COPYFILE_EXCL);
+            await fs.copyFile(source, destination);
             createdFiles.push(destination);
         }
     }
     catch (error) {
-        // Roll back only files and directories created by this merge.
+        // Roll back files and directories created by this merge if it failed
         for (const file of createdFiles.reverse()) {
             await fs.rm(file, { force: true }).catch(() => { });
         }
