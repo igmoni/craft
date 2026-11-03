@@ -14,6 +14,7 @@ export async function isPackageManagerInstalled(
     await execa(pm, ["--version"], {
       stdio: "ignore",
       windowsHide: true,
+      shell: process.platform === "win32",
       reject: true,
     });
     return true;

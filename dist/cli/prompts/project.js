@@ -62,18 +62,21 @@ export const promptProjectConfig = async (existing = {}) => {
     }
     // Step 5: Database (only if supported by framework)
     let database = "none";
-    if (capabilities.database) {
+    if (capabilities.databases.length > 0) {
         if (existing.database !== undefined) {
             database = existing.database;
         }
         else {
+            const choices = capabilities.databases.map((db) => {
+                if (db === "postgres") {
+                    return { name: "PostgreSQL (Prisma)", value: "postgres" };
+                }
+                return { name: "MongoDB (Mongoose)", value: "mongodb" };
+            });
+            choices.push({ name: "None", value: "none" });
             database = await select({
                 message: "Choose a database",
-                choices: [
-                    { name: "PostgreSQL (Prisma)", value: "postgres" },
-                    { name: "MongoDB (Mongoose)", value: "mongodb" },
-                    { name: "None", value: "none" },
-                ],
+                choices,
                 default: "none",
             });
         }
@@ -106,9 +109,22 @@ export const promptProjectConfig = async (existing = {}) => {
             }
         }
     }
-    // Step 7: UI Library (only if supported by framework)
+    // Step 7: Styling (Tailwind CSS)
+    let tailwind = false;
+    if (capabilities.styling.includes("tailwind")) {
+        if (existing.tailwind !== undefined) {
+            tailwind = existing.tailwind;
+        }
+        else {
+            tailwind = await confirm({
+                message: "Use Tailwind CSS?",
+                default: true,
+            });
+        }
+    }
+    // Step 8: UI Library (only if supported by framework and Tailwind is enabled)
     let uiLibrary = false;
-    if (capabilities.shadcn) {
+    if (capabilities.shadcn && tailwind) {
         if (existing.uiLibrary !== undefined) {
             uiLibrary = existing.uiLibrary;
         }
@@ -120,37 +136,54 @@ export const promptProjectConfig = async (existing = {}) => {
             uiLibrary = wantsShadcn ? "shadcn" : false;
         }
     }
-    // Step 8: Development Tools
+    // Step 9: Development Tools (filtered to framework capabilities)
     let tools;
     if (existing.tools !== undefined) {
         tools = existing.tools;
     }
     else {
-        tools = await checkbox({
-            message: "Which development tools do you want?",
-            choices: [
-                { name: "ESLint", value: "eslint", checked: true },
-                { name: "Prettier", value: "prettier", checked: true },
-                { name: "Husky (Git hooks)", value: "husky" },
-                { name: "Commitlint (Conventional commits)", value: "commitlint" },
-            ],
-        });
+        const toolChoices = [];
+        if (capabilities.tools.includes("eslint")) {
+            toolChoices.push({ name: "ESLint", value: "eslint", checked: true });
+        }
+        if (capabilities.tools.includes("prettier")) {
+            toolChoices.push({ name: "Prettier", value: "prettier", checked: true });
+        }
+        if (capabilities.tools.includes("husky")) {
+            toolChoices.push({ name: "Husky (Git hooks)", value: "husky" });
+        }
+        if (capabilities.tools.includes("commitlint")) {
+            toolChoices.push({
+                name: "Commitlint (Conventional commits)",
+                value: "commitlint",
+            });
+        }
+        if (toolChoices.length > 0) {
+            tools = await checkbox({
+                message: "Which development tools do you want?",
+                choices: toolChoices,
+            });
+        }
+        else {
+            tools = [];
+        }
     }
-    // Step 9: Package Manager
+    // Step 10: Package Manager (filtered to framework capabilities)
     let packageManager;
     if (existing.packageManager !== undefined) {
         packageManager = existing.packageManager;
     }
     else {
+        const pmChoices = capabilities.packageManagers.map((pm) => ({
+            name: pm === "yarn" ? "Yarn" : pm === "bun" ? "Bun" : pm,
+            value: pm,
+        }));
         packageManager = await select({
             message: "Choose a package manager",
-            choices: [
-                { name: "npm", value: "npm" },
-                { name: "pnpm", value: "pnpm" },
-                { name: "Yarn", value: "yarn" },
-                { name: "Bun", value: "bun" },
-            ],
-            default: "npm",
+            choices: pmChoices,
+            default: (capabilities.packageManagers.includes("npm")
+                ? "npm"
+                : capabilities.packageManagers[0]),
         });
     }
     return {
@@ -159,6 +192,7 @@ export const promptProjectConfig = async (existing = {}) => {
         typeScript,
         database,
         auth,
+        tailwind,
         uiLibrary,
         tools,
         packageManager,

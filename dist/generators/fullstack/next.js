@@ -14,7 +14,7 @@ export const nextGenerator = {
         const dlx = getDlxCommand(options.packageManager, "create-next-app@latest", [
             projectDirectory,
             options.typeScript ? "--ts" : "--js",
-            "--tailwind",
+            options.tailwind !== false ? "--tailwind" : "--no-tailwind",
             "--app",
             "--src-dir",
             "--import-alias",

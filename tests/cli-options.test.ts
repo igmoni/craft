@@ -36,6 +36,8 @@ describe("CLI Option Parsing", () => {
         .option("-f, --framework <framework>")
         .option("-d, --database <database>")
         .option("--auth <provider>")
+        .option("--tailwind")
+        .option("--no-tailwind")
         .option("--shadcn")
         .option("-p, --package-manager <manager>");
 
@@ -48,6 +50,7 @@ describe("CLI Option Parsing", () => {
         "postgres",
         "--auth",
         "better-auth",
+        "--tailwind",
         "--shadcn",
         "--package-manager",
         "pnpm",
@@ -57,8 +60,19 @@ describe("CLI Option Parsing", () => {
       assert.equal(opts.framework, "next");
       assert.equal(opts.database, "postgres");
       assert.equal(opts.auth, "better-auth");
+      assert.equal(opts.tailwind, true);
       assert.equal(opts.uiLibrary, "shadcn");
       assert.equal(opts.packageManager, "pnpm");
+    });
+
+    it("should handle --no-tailwind accurately", () => {
+      const cmd = new Command();
+      cmd.option("--tailwind").option("--no-tailwind");
+
+      cmd.parse(["node", "craft", "--no-tailwind"]);
+
+      const opts = getProvidedOptions(cmd);
+      assert.equal(opts.tailwind, false);
     });
   });
 });

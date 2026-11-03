@@ -121,14 +121,21 @@ export function validateExistingConfig(
     );
   }
 
-  if (
-    config.database !== undefined &&
-    config.database !== "none" &&
-    !capabilities.database
-  ) {
-    throw new Error(
-      `${frameworkInfo.name} is a frontend framework and does not support Craft database integration.`
-    );
+  if (config.database !== undefined && config.database !== "none") {
+    if (!capabilities.database) {
+      throw new Error(
+        `${frameworkInfo.name} does not support Craft database integration.`
+      );
+    }
+    if (!capabilities.databases.includes(config.database)) {
+      const supported =
+        capabilities.databases.length > 0
+          ? capabilities.databases.join(", ")
+          : "none";
+      throw new Error(
+        `${config.database} database is not supported for ${frameworkInfo.name}. (Supported: ${supported})`
+      );
+    }
   }
 
   if (config.auth && !capabilities.authProviders.includes(config.auth)) {
@@ -141,10 +148,40 @@ export function validateExistingConfig(
     );
   }
 
-  if (config.uiLibrary === "shadcn" && !capabilities.shadcn) {
+  if (config.tailwind === true && !capabilities.styling.includes("tailwind")) {
+    throw new Error(`Tailwind CSS is not supported for ${frameworkInfo.name}.`);
+  }
+
+  if (config.uiLibrary === "shadcn") {
+    if (!capabilities.shadcn) {
+      throw new Error(
+        `shadcn/ui is not supported for ${frameworkInfo.name}. Only React (Vite) and Next.js are supported.`
+      );
+    }
+    if (config.tailwind === false) {
+      throw new Error(
+        `shadcn/ui requires Tailwind CSS. Please enable Tailwind CSS or remove shadcn/ui.`
+      );
+    }
+  }
+
+  if (
+    config.packageManager &&
+    !capabilities.packageManagers.includes(config.packageManager)
+  ) {
     throw new Error(
-      `shadcn/ui is not supported for ${frameworkInfo.name}. Only React (Vite) and Next.js are supported.`
+      `Unsupported package manager "${config.packageManager}" for ${frameworkInfo.name}. (Supported: ${capabilities.packageManagers.join(", ")})`
     );
+  }
+
+  if (config.tools) {
+    for (const tool of config.tools) {
+      if (!capabilities.tools.includes(tool)) {
+        throw new Error(
+          `Tool "${tool}" is not supported for ${frameworkInfo.name}. (Supported: ${capabilities.tools.join(", ")})`
+        );
+      }
+    }
   }
 }
 
@@ -173,10 +210,17 @@ export function validateConfig(config: GeneratorOptions): void {
     );
   }
 
-  if (config.database !== "none" && !capabilities.database) {
-    throw new Error(
-      `${framework.name} does not support Craft database integration.`
-    );
+  if (config.database !== "none") {
+    if (!capabilities.database) {
+      throw new Error(
+        `${framework.name} does not support Craft database integration.`
+      );
+    }
+    if (!capabilities.databases.includes(config.database)) {
+      throw new Error(
+        `${config.database} database is not supported for ${framework.name}.`
+      );
+    }
   }
 
   if (config.auth && !capabilities.authProviders.includes(config.auth)) {
@@ -185,14 +229,34 @@ export function validateConfig(config: GeneratorOptions): void {
     );
   }
 
-  if (config.uiLibrary === "shadcn" && !capabilities.shadcn) {
-    throw new Error(`shadcn/ui is not supported for ${framework.name}.`);
+  if (config.tailwind === true && !capabilities.styling.includes("tailwind")) {
+    throw new Error(`Tailwind CSS is not supported for ${framework.name}.`);
   }
 
-  const supportedPackageManagers = ["npm", "pnpm", "yarn", "bun"];
-  if (!supportedPackageManagers.includes(config.packageManager)) {
+  if (config.uiLibrary === "shadcn") {
+    if (!capabilities.shadcn) {
+      throw new Error(`shadcn/ui is not supported for ${framework.name}.`);
+    }
+    if (config.tailwind === false) {
+      throw new Error(
+        `shadcn/ui requires Tailwind CSS. Please enable Tailwind CSS or remove shadcn/ui.`
+      );
+    }
+  }
+
+  if (!capabilities.packageManagers.includes(config.packageManager)) {
     throw new Error(
-      `Unsupported package manager: "${config.packageManager}". Supported: ${supportedPackageManagers.join(", ")}`
+      `Unsupported package manager "${config.packageManager}" for ${framework.name}. Supported: ${capabilities.packageManagers.join(", ")}`
     );
+  }
+
+  if (config.tools) {
+    for (const tool of config.tools) {
+      if (!capabilities.tools.includes(tool)) {
+        throw new Error(
+          `Tool "${tool}" is not supported for ${framework.name}. Supported: ${capabilities.tools.join(", ")}`
+        );
+      }
+    }
   }
 }

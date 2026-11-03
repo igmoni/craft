@@ -66,6 +66,10 @@ export const getProvidedOptions = (command: Command): PartialProjectConfig => {
     config.packageManager = options.packageManager;
   }
 
+  if (command.getOptionValueSource("tailwind") === "cli") {
+    config.tailwind = Boolean(options.tailwind);
+  }
+
   if (command.getOptionValueSource("shadcn") === "cli") {
     config.uiLibrary = options.shadcn ? "shadcn" : false;
   }
@@ -110,6 +114,9 @@ export const registerInitCommand = (program: Command): void => {
       "none",
     ])
   );
+
+  init.addOption(new Option("--tailwind", "Use Tailwind CSS"));
+  init.addOption(new Option("--no-tailwind", "Skip Tailwind CSS"));
 
   init.addOption(new Option("--shadcn", "Add shadcn/ui integration"));
   init.addOption(new Option("--no-shadcn", "Skip shadcn/ui integration"));

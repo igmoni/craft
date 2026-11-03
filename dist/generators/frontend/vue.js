@@ -9,6 +9,8 @@ export const vueGenerator = {
             projectDirectory,
             "--template",
             template,
+            "--no-interactive",
+            "--no-immediate",
         ]);
         await runCommand(dlx.command, dlx.args, path.dirname(options.targetDir));
     },

@@ -76,10 +76,16 @@ export function validateExistingConfig(config, framework) {
     if (config.typeScript === false && !capabilities.javascript) {
         throw new Error(`${frameworkInfo.name} does not support JavaScript. Only TypeScript is supported.`);
     }
-    if (config.database !== undefined &&
-        config.database !== "none" &&
-        !capabilities.database) {
-        throw new Error(`${frameworkInfo.name} is a frontend framework and does not support Craft database integration.`);
+    if (config.database !== undefined && config.database !== "none") {
+        if (!capabilities.database) {
+            throw new Error(`${frameworkInfo.name} does not support Craft database integration.`);
+        }
+        if (!capabilities.databases.includes(config.database)) {
+            const supported = capabilities.databases.length > 0
+                ? capabilities.databases.join(", ")
+                : "none";
+            throw new Error(`${config.database} database is not supported for ${frameworkInfo.name}. (Supported: ${supported})`);
+        }
     }
     if (config.auth && !capabilities.authProviders.includes(config.auth)) {
         const supported = capabilities.authProviders.length > 0
@@ -87,8 +93,27 @@ export function validateExistingConfig(config, framework) {
             : "none";
         throw new Error(`${config.auth} authentication is not supported for ${frameworkInfo.name}. (Supported: ${supported})`);
     }
-    if (config.uiLibrary === "shadcn" && !capabilities.shadcn) {
-        throw new Error(`shadcn/ui is not supported for ${frameworkInfo.name}. Only React (Vite) and Next.js are supported.`);
+    if (config.tailwind === true && !capabilities.styling.includes("tailwind")) {
+        throw new Error(`Tailwind CSS is not supported for ${frameworkInfo.name}.`);
+    }
+    if (config.uiLibrary === "shadcn") {
+        if (!capabilities.shadcn) {
+            throw new Error(`shadcn/ui is not supported for ${frameworkInfo.name}. Only React (Vite) and Next.js are supported.`);
+        }
+        if (config.tailwind === false) {
+            throw new Error(`shadcn/ui requires Tailwind CSS. Please enable Tailwind CSS or remove shadcn/ui.`);
+        }
+    }
+    if (config.packageManager &&
+        !capabilities.packageManagers.includes(config.packageManager)) {
+        throw new Error(`Unsupported package manager "${config.packageManager}" for ${frameworkInfo.name}. (Supported: ${capabilities.packageManagers.join(", ")})`);
+    }
+    if (config.tools) {
+        for (const tool of config.tools) {
+            if (!capabilities.tools.includes(tool)) {
+                throw new Error(`Tool "${tool}" is not supported for ${frameworkInfo.name}. (Supported: ${capabilities.tools.join(", ")})`);
+            }
+        }
     }
 }
 export function validateConfig(config) {
@@ -107,18 +132,37 @@ export function validateConfig(config) {
     if (!config.typeScript && !capabilities.javascript) {
         throw new Error(`${framework.name} does not support JavaScript scaffolding.`);
     }
-    if (config.database !== "none" && !capabilities.database) {
-        throw new Error(`${framework.name} does not support Craft database integration.`);
+    if (config.database !== "none") {
+        if (!capabilities.database) {
+            throw new Error(`${framework.name} does not support Craft database integration.`);
+        }
+        if (!capabilities.databases.includes(config.database)) {
+            throw new Error(`${config.database} database is not supported for ${framework.name}.`);
+        }
     }
     if (config.auth && !capabilities.authProviders.includes(config.auth)) {
         throw new Error(`${config.auth} authentication is not supported for ${framework.name}.`);
     }
-    if (config.uiLibrary === "shadcn" && !capabilities.shadcn) {
-        throw new Error(`shadcn/ui is not supported for ${framework.name}.`);
+    if (config.tailwind === true && !capabilities.styling.includes("tailwind")) {
+        throw new Error(`Tailwind CSS is not supported for ${framework.name}.`);
     }
-    const supportedPackageManagers = ["npm", "pnpm", "yarn", "bun"];
-    if (!supportedPackageManagers.includes(config.packageManager)) {
-        throw new Error(`Unsupported package manager: "${config.packageManager}". Supported: ${supportedPackageManagers.join(", ")}`);
+    if (config.uiLibrary === "shadcn") {
+        if (!capabilities.shadcn) {
+            throw new Error(`shadcn/ui is not supported for ${framework.name}.`);
+        }
+        if (config.tailwind === false) {
+            throw new Error(`shadcn/ui requires Tailwind CSS. Please enable Tailwind CSS or remove shadcn/ui.`);
+        }
+    }
+    if (!capabilities.packageManagers.includes(config.packageManager)) {
+        throw new Error(`Unsupported package manager "${config.packageManager}" for ${framework.name}. Supported: ${capabilities.packageManagers.join(", ")}`);
+    }
+    if (config.tools) {
+        for (const tool of config.tools) {
+            if (!capabilities.tools.includes(tool)) {
+                throw new Error(`Tool "${tool}" is not supported for ${framework.name}. Supported: ${capabilities.tools.join(", ")}`);
+            }
+        }
     }
 }
 //# sourceMappingURL=validate.js.map

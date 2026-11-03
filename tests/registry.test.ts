@@ -117,6 +117,51 @@ describe("Framework Registry", () => {
     assert.deepEqual(getFramework("nestjs").capabilities.authProviders, []);
     assert.deepEqual(getFramework("fastify").capabilities.authProviders, []);
     assert.deepEqual(getFramework("hono").capabilities.authProviders, []);
+
+    // NestJS does not support Bun in official CLI
+    assert.deepEqual(getFramework("nestjs").capabilities.packageManagers, [
+      "npm",
+      "pnpm",
+      "yarn",
+    ]);
+  });
+
+  it("should declare centralized databases, styling, tools, and packageManagers", () => {
+    for (const fw of expectedFrameworks) {
+      const def = getFramework(fw);
+      assert.ok(Array.isArray(def.capabilities.databases));
+      assert.ok(Array.isArray(def.capabilities.styling));
+      assert.ok(Array.isArray(def.capabilities.packageManagers));
+      assert.ok(Array.isArray(def.capabilities.tools));
+    }
+
+    // Angular has prettier, husky, commitlint (ESLint is configured via angular-eslint if desired)
+    assert.deepEqual(getFramework("angular").capabilities.tools, [
+      "prettier",
+      "husky",
+      "commitlint",
+    ]);
+
+    // Other 7 frameworks include eslint
+    for (const fw of expectedFrameworks.filter((f) => f !== "angular")) {
+      assert.deepEqual(getFramework(fw).capabilities.tools, [
+        "eslint",
+        "prettier",
+        "husky",
+        "commitlint",
+      ]);
+    }
+
+    // Frontend databases must be empty
+    assert.deepEqual(getFramework("angular").capabilities.databases, []);
+    assert.deepEqual(getFramework("vue").capabilities.databases, []);
+    assert.deepEqual(getFramework("react").capabilities.databases, []);
+
+    // Backend styling must be empty
+    assert.deepEqual(getFramework("nestjs").capabilities.styling, []);
+    assert.deepEqual(getFramework("express").capabilities.styling, []);
+    assert.deepEqual(getFramework("fastify").capabilities.styling, []);
+    assert.deepEqual(getFramework("hono").capabilities.styling, []);
   });
 
   it("should enforce Next.js capability constraints", () => {

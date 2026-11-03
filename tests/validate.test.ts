@@ -106,6 +106,42 @@ describe("Configuration & Validation", () => {
         validateExistingConfig({ auth: "better-auth" }, "express")
       );
     });
+
+    it("should reject Bun for NestJS", () => {
+      assert.throws(
+        () => validateExistingConfig({ packageManager: "bun" }, "nestjs"),
+        /Unsupported package manager "bun" for NestJS/
+      );
+    });
+
+    it("should reject Tailwind CSS for backend frameworks", () => {
+      assert.throws(
+        () => validateExistingConfig({ tailwind: true }, "express"),
+        /Tailwind CSS is not supported for Express/
+      );
+      assert.throws(
+        () => validateExistingConfig({ tailwind: true }, "nestjs"),
+        /Tailwind CSS is not supported for NestJS/
+      );
+    });
+
+    it("should reject shadcn when Tailwind is disabled", () => {
+      assert.throws(
+        () =>
+          validateExistingConfig(
+            { uiLibrary: "shadcn", tailwind: false },
+            "next"
+          ),
+        /shadcn\/ui requires Tailwind CSS/
+      );
+    });
+
+    it("should reject unsupported tools", () => {
+      assert.throws(
+        () => validateExistingConfig({ tools: ["webpack" as any] }, "next"),
+        /Tool "webpack" is not supported/
+      );
+    });
   });
 
   describe("validateConfig", () => {
@@ -132,6 +168,32 @@ describe("Configuration & Validation", () => {
             packageManager: "cargo" as any,
           }),
         /Unsupported package manager/
+      );
+    });
+
+    it("should reject Bun on NestJS in full config", () => {
+      assert.throws(
+        () =>
+          validateConfig({
+            ...validConfig,
+            framework: "nestjs",
+            uiLibrary: false,
+            auth: false,
+            packageManager: "bun",
+          }),
+        /Unsupported package manager "bun" for NestJS/
+      );
+    });
+
+    it("should reject shadcn when tailwind is false in full config", () => {
+      assert.throws(
+        () =>
+          validateConfig({
+            ...validConfig,
+            tailwind: false,
+            uiLibrary: "shadcn",
+          }),
+        /shadcn\/ui requires Tailwind CSS/
       );
     });
 

@@ -5,8 +5,12 @@ import type {
 } from "./framework.js";
 
 export type DatabaseType = "postgres" | "mongodb" | "none";
+export type DatabaseOption = "postgres" | "mongodb";
 
 export type ToolType = "eslint" | "prettier" | "husky" | "commitlint";
+export type ToolOption = ToolType;
+
+export type StylingOption = "tailwind";
 
 export type PackageManager = "npm" | "bun" | "pnpm" | "yarn";
 
@@ -22,6 +26,7 @@ export interface GenerateProjectConfig {
   typeScript: boolean;
   database: DatabaseType;
   auth: AuthOption;
+  tailwind?: boolean;
   uiLibrary?: UILibraryOption;
   tools: ToolType[];
   packageManager: PackageManager;

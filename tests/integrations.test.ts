@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 
 import { configureAuth } from "../dist/generators/auth.js";
+import { expressGenerator } from "../dist/generators/backend/express.js";
 import { configureDatabase } from "../dist/generators/database.js";
 import { generateEnvFile } from "../dist/generators/env.js";
 import { configureTailwind } from "../dist/generators/tailwind.js";
@@ -12,6 +13,7 @@ import { configureTools } from "../dist/generators/tools.js";
 import {
   createStagingDirectory,
   mergeStagedFiles,
+  resolveStagingProjectDirectory,
 } from "../dist/services/staging.js";
 import { pathExists } from "../dist/utils/error.js";
 
@@ -44,6 +46,123 @@ describe("Integrations & File Operations", () => {
       // Clean up
       await fs.rm(stagingRoot, { recursive: true, force: true });
       await fs.rm(targetDir, { recursive: true, force: true });
+    });
+
+    it("should reject merging when staging directory is empty", async () => {
+      const stagingRoot = await createStagingDirectory();
+      const targetDir = await createTempDir();
+      const emptyStagingDir = path.join(stagingRoot, "empty-app");
+      await fs.mkdir(emptyStagingDir, { recursive: true });
+
+      await assert.rejects(
+        () => mergeStagedFiles(emptyStagingDir, targetDir),
+        /Staging directory .* is empty/
+      );
+
+      await fs.rm(stagingRoot, { recursive: true, force: true });
+      await fs.rm(targetDir, { recursive: true, force: true });
+    });
+
+    it("should preserve existing user files when allowExisting is true", async () => {
+      const stagingRoot = await createStagingDirectory();
+      const targetDir = await createTempDir();
+
+      const stagedDir = path.join(stagingRoot, "app");
+      await fs.mkdir(stagedDir, { recursive: true });
+      await fs.writeFile(path.join(stagedDir, "file.txt"), "from staging");
+      await fs.writeFile(path.join(stagedDir, "new-file.txt"), "new content");
+
+      // Pre-existing user file
+      await fs.writeFile(
+        path.join(targetDir, "file.txt"),
+        "original user content"
+      );
+
+      await mergeStagedFiles(stagedDir, targetDir, true);
+
+      // Existing file must be preserved
+      assert.equal(
+        await fs.readFile(path.join(targetDir, "file.txt"), "utf8"),
+        "original user content"
+      );
+      // New file must be copied
+      assert.equal(
+        await fs.readFile(path.join(targetDir, "new-file.txt"), "utf8"),
+        "new content"
+      );
+
+      await fs.rm(stagingRoot, { recursive: true, force: true });
+      await fs.rm(targetDir, { recursive: true, force: true });
+    });
+
+    it("should resolve staging directory under normal conditions", async () => {
+      const stagingRoot = await createStagingDirectory();
+      const normalDir = path.join(stagingRoot, "my-app");
+      await fs.mkdir(normalDir, { recursive: true });
+      await fs.writeFile(path.join(normalDir, "package.json"), "{}");
+
+      const resolved = await resolveStagingProjectDirectory(
+        stagingRoot,
+        "my-app"
+      );
+      assert.equal(resolved, normalDir);
+
+      await fs.rm(stagingRoot, { recursive: true, force: true });
+    });
+
+    it("should unwrap unnecessary nested project directory", async () => {
+      const stagingRoot = await createStagingDirectory();
+      const outerDir = path.join(stagingRoot, "my-app");
+      const nestedDir = path.join(outerDir, "my-app");
+      await fs.mkdir(nestedDir, { recursive: true });
+      await fs.writeFile(path.join(nestedDir, "package.json"), "{}");
+
+      const resolved = await resolveStagingProjectDirectory(
+        stagingRoot,
+        "my-app"
+      );
+      assert.equal(resolved, nestedDir);
+
+      await fs.rm(stagingRoot, { recursive: true, force: true });
+    });
+
+    it("should resolve alternative folder name (e.g. vite-project)", async () => {
+      const stagingRoot = await createStagingDirectory();
+      const viteDir = path.join(stagingRoot, "vite-project");
+      await fs.mkdir(viteDir, { recursive: true });
+      await fs.writeFile(path.join(viteDir, "package.json"), "{}");
+
+      const resolved = await resolveStagingProjectDirectory(
+        stagingRoot,
+        "custom-name"
+      );
+      assert.equal(resolved, viteDir);
+
+      await fs.rm(stagingRoot, { recursive: true, force: true });
+    });
+
+    it("should resolve root directory when files are scaffolded directly into stagingRoot", async () => {
+      const stagingRoot = await createStagingDirectory();
+      await fs.writeFile(path.join(stagingRoot, "package.json"), "{}");
+
+      const resolved = await resolveStagingProjectDirectory(
+        stagingRoot,
+        "my-app"
+      );
+      assert.equal(resolved, stagingRoot);
+
+      await fs.rm(stagingRoot, { recursive: true, force: true });
+    });
+
+    it("should throw error when staging directory produced no files", async () => {
+      const stagingRoot = await createStagingDirectory();
+
+      await assert.rejects(
+        () => resolveStagingProjectDirectory(stagingRoot, "my-app"),
+        /No files were generated in staging directory/
+      );
+
+      await fs.rm(stagingRoot, { recursive: true, force: true });
     });
   });
 
@@ -388,6 +507,71 @@ describe("Integrations & File Operations", () => {
       assert.equal(createdSecondTime, false);
       const content = await fs.readFile(path.join(dir, ".env"), "utf8");
       assert.equal(content, "KEY=CUSTOM\n");
+
+      await fs.rm(dir, { recursive: true, force: true });
+    });
+  });
+
+  describe("Framework Generators (Express & Hono structure)", () => {
+    it("should generate Express project in TypeScript with database and auth hooks", async () => {
+      const dir = await createTempDir();
+
+      await expressGenerator.generate({
+        projectName: "express-ts",
+        framework: "express",
+        typeScript: true,
+        database: "postgres",
+        auth: "better-auth",
+        tools: [],
+        packageManager: "npm",
+        targetDir: dir,
+      });
+
+      assert.ok(await pathExists(path.join(dir, "package.json")));
+      assert.ok(await pathExists(path.join(dir, "src", "index.ts")));
+
+      const pkg = JSON.parse(
+        await fs.readFile(path.join(dir, "package.json"), "utf8")
+      );
+      assert.equal(pkg.dependencies.express, "latest");
+      assert.equal(pkg.devDependencies.typescript, "latest");
+      assert.equal(pkg.scripts.dev, "tsx watch src/index.ts");
+
+      const indexContent = await fs.readFile(
+        path.join(dir, "src", "index.ts"),
+        "utf8"
+      );
+      assert.ok(indexContent.includes('import express from "express";'));
+      assert.ok(indexContent.includes('from "./db.js";'));
+      assert.ok(indexContent.includes('from "better-auth/node";'));
+
+      await fs.rm(dir, { recursive: true, force: true });
+    });
+
+    it("should generate Express project in JavaScript without TS types", async () => {
+      const dir = await createTempDir();
+
+      await expressGenerator.generate({
+        projectName: "express-js",
+        framework: "express",
+        typeScript: false,
+        database: "mongodb",
+        auth: false,
+        tools: [],
+        packageManager: "npm",
+        targetDir: dir,
+      });
+
+      assert.ok(await pathExists(path.join(dir, "package.json")));
+      assert.ok(await pathExists(path.join(dir, "src", "index.js")));
+      assert.equal(await pathExists(path.join(dir, "src", "index.ts")), false);
+
+      const pkg = JSON.parse(
+        await fs.readFile(path.join(dir, "package.json"), "utf8")
+      );
+      assert.equal(pkg.dependencies.express, "latest");
+      assert.equal(pkg.devDependencies, undefined);
+      assert.equal(pkg.scripts.dev, "node --watch src/index.js");
 
       await fs.rm(dir, { recursive: true, force: true });
     });

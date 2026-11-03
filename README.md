@@ -83,9 +83,10 @@ Craft will guide you step-by-step:
 4. **Language** — TypeScript or JavaScript (skipped for TypeScript-only frameworks like Angular)
 5. **Database** — PostgreSQL (Prisma), MongoDB (Mongoose), or None (only prompted for supported backend/full-stack frameworks)
 6. **Authentication** — Provider options filtered to framework support
-7. **UI Library** — Option to add shadcn/ui (React Vite & Next.js)
-8. **Development Tools** — Multi-select ESLint, Prettier, Husky, Commitlint
-9. **Package Manager** — npm, pnpm, yarn, bun
+7. **Styling** — Option to use Tailwind CSS (Angular, Vue, React, Next.js)
+8. **UI Library** — Option to add shadcn/ui (React Vite & Next.js with Tailwind)
+9. **Development Tools** — Multi-select ESLint, Prettier, Husky, Commitlint (filtered by framework)
+10. **Package Manager** — npm, pnpm, yarn, bun (framework-aware, e.g. NestJS limits to npm, pnpm, yarn)
 
 ### Non-Interactive (CLI Flags) Mode
 
@@ -129,10 +130,12 @@ craft init client-app \
 | `--js`                       | Use JavaScript            |                                                                           |
 | `-d, --database <db>`        | Database integration      | `postgres`, `mongodb`, `none`                                             |
 | `--auth <provider>`          | Authentication provider   | `better-auth`, `authjs`, `clerk`, `none`                                  |
+| `--tailwind`                 | Use Tailwind CSS          |                                                                           |
+| `--no-tailwind`              | Skip Tailwind CSS         |                                                                           |
 | `--shadcn`                   | Add shadcn/ui integration |                                                                           |
 | `--no-shadcn`                | Skip shadcn/ui            |                                                                           |
 | `-t, --tools <tools>`        | Comma-separated dev tools | `eslint`, `prettier`, `husky`, `commitlint`                               |
-| `-p, --package-manager <pm>` | Preferred package manager | `npm`, `pnpm`, `yarn`, `bun`                                              |
+| `-p, --package-manager <pm>` | Preferred package manager | `npm`, `pnpm`, `yarn`, `bun` (NestJS: `npm`, `pnpm`, `yarn`)              |
 | `-v, --version`              | Output CLI version        |                                                                           |
 | `-h, --help`                 | Display command help      |                                                                           |
 

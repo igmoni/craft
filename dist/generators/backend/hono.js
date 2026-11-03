@@ -11,10 +11,6 @@ export const honoGenerator = {
             projectDirectory,
             "--template",
             "nodejs",
-            "--pm",
-            options.packageManager,
-            "--install",
-            "false",
         ]);
         await runCommand(dlx.command, dlx.args, path.dirname(targetDir));
         if (options.typeScript)

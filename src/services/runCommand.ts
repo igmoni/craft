@@ -9,7 +9,8 @@ export async function runCommand(
     await execa(command, args, {
       cwd,
       stdio: "inherit",
-      windowsHide: true,
+      windowsHide: false,
+      shell: process.platform === "win32",
       reject: true,
     });
   } catch (error: unknown) {

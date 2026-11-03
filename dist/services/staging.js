@@ -43,8 +43,55 @@ async function inspect(target) {
         throw error;
     }
 }
+export async function resolveStagingProjectDirectory(stagingRoot, expectedProjectName) {
+    const candidate = path.join(stagingRoot, expectedProjectName);
+    const candidateInfo = await inspect(candidate);
+    if (candidateInfo.exists && candidateInfo.isDirectory) {
+        const candidateEntries = await fs.readdir(candidate);
+        if (candidateEntries.length > 0) {
+            // Check for nested directory: candidate/expectedProjectName
+            const nested = path.join(candidate, expectedProjectName);
+            const nestedInfo = await inspect(nested);
+            if (nestedInfo.exists && nestedInfo.isDirectory) {
+                const hasPackageJsonAtCandidate = await inspect(path.join(candidate, "package.json"));
+                const hasPackageJsonAtNested = await inspect(path.join(nested, "package.json"));
+                if (!hasPackageJsonAtCandidate.exists &&
+                    hasPackageJsonAtNested.exists) {
+                    return nested;
+                }
+            }
+            return candidate;
+        }
+    }
+    // Check if stagingRoot has package.json directly
+    const rootPackageJson = await inspect(path.join(stagingRoot, "package.json"));
+    if (rootPackageJson.exists) {
+        return stagingRoot;
+    }
+    // Look for any subdirectory in stagingRoot that has package.json or files
+    const rootEntries = await fs.readdir(stagingRoot, { withFileTypes: true });
+    const subDirs = rootEntries.filter((e) => e.isDirectory() && e.name !== "node_modules" && e.name !== ".git");
+    for (const dir of subDirs) {
+        const subDirPath = path.join(stagingRoot, dir.name);
+        const pkgJson = await inspect(path.join(subDirPath, "package.json"));
+        if (pkgJson.exists) {
+            return subDirPath;
+        }
+    }
+    if (subDirs.length === 1) {
+        const subDirPath = path.join(stagingRoot, subDirs[0].name);
+        const subEntries = await fs.readdir(subDirPath);
+        if (subEntries.length > 0) {
+            return subDirPath;
+        }
+    }
+    throw new Error(`No files were generated in staging directory (${stagingRoot}). Generator produced no output.`);
+}
 export async function mergeStagedFiles(stagingDir, targetDir, allowExisting = false) {
     const entries = await listEntries(stagingDir);
+    if (entries.length === 0) {
+        throw new Error(`Staging directory "${stagingDir}" is empty. Generator produced no files.`);
+    }
     const targetInfo = await inspect(targetDir);
     if (targetInfo.exists && !targetInfo.isDirectory) {
         throw new Error(`Target is not a directory: ${targetDir}`);
@@ -90,6 +137,14 @@ export async function mergeStagedFiles(stagingDir, targetDir, allowExisting = fa
             }
             else if (!parentInfo.isDirectory) {
                 throw new Error(`Directory conflict: ${parentDir}`);
+            }
+            const destInfo = await inspect(destination);
+            if (destInfo.exists) {
+                if (destInfo.isDirectory) {
+                    throw new Error(`Directory conflict: ${destination}`);
+                }
+                // Preserve existing user file when allowExisting is true
+                continue;
             }
             await fs.copyFile(source, destination);
             createdFiles.push(destination);

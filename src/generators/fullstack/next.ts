@@ -23,7 +23,7 @@ export const nextGenerator: FrameworkGenerator = {
       [
         projectDirectory,
         options.typeScript ? "--ts" : "--js",
-        "--tailwind",
+        options.tailwind !== false ? "--tailwind" : "--no-tailwind",
         "--app",
         "--src-dir",
         "--import-alias",
