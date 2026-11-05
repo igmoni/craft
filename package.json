@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "tsc && node --test tests/*.test.ts",
+    "test:generators": "tsc && node tests/generators/runner.ts",
     "typecheck": "tsc --noEmit",
     "dev": "tsc --watch",
     "build": "tsc",
