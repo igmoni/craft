@@ -451,6 +451,7 @@ export const extendedIntegrationTargets: FrameworkTestTarget[] = [
       files: [
         "package.json",
         "prisma/schema.prisma",
+        "prisma.config.ts",
         "src/db.ts",
         ".env.example",
         ".env",
@@ -459,7 +460,13 @@ export const extendedIntegrationTargets: FrameworkTestTarget[] = [
       ],
       directories: ["prisma", "src"],
       packageJson: {
-        requiredDependencies: ["express", "@prisma/client", "dotenv"],
+        requiredDependencies: [
+          "express",
+          "@prisma/client",
+          "@prisma/adapter-pg",
+          "pg",
+          "dotenv",
+        ],
         requiredDevDependencies: ["prisma"],
         requiredScripts: ["db:generate", "db:migrate", "build"],
       },

@@ -13,9 +13,9 @@ async function addEnvironmentVariable(filePath, key, value) {
     const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
     await fs.writeFile(filePath, `${content}${separator}${key}=${value}\n`);
 }
-async function addGitignoreRules(projectDir) {
+async function addGitignoreRules(projectDir, extraRules = []) {
     const filePath = path.join(projectDir, ".gitignore");
-    const rules = [".env", ".env.*", "!.env.example"];
+    const rules = [".env", ".env.*", "!.env.example", ...extraRules];
     const content = (await pathExists(filePath))
         ? await fs.readFile(filePath, "utf8")
         : "";
@@ -26,24 +26,54 @@ async function addGitignoreRules(projectDir) {
     const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
     await fs.writeFile(filePath, `${content}${separator}${missing.join("\n")}\n`);
 }
-function getPrismaSchema() {
+export function getPrismaSchema() {
     return `// This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 `;
 }
-function getPrismaSource(typeScript) {
+export function getPrismaConfig() {
+    return `import "dotenv/config";
+import { defineConfig, env } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  datasource: {
+    url: env("DATABASE_URL"),
+  },
+});
+`;
+}
+export function calculatePrismaClientImport(dbFilePath, projectDir) {
+    const dbDir = path.dirname(dbFilePath);
+    const clientTarget = path.join(projectDir, "src", "generated", "prisma", "client");
+    let relativePath = path.relative(dbDir, clientTarget).replace(/\\/g, "/");
+    if (!relativePath.startsWith("./") && !relativePath.startsWith("../")) {
+        relativePath = `./${relativePath}`;
+    }
+    return relativePath;
+}
+export function getPrismaSource(typeScript, clientImport = "./generated/prisma/client") {
     if (typeScript) {
         return `import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "${clientImport}";
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not defined");
+}
+
+const adapter = new PrismaPg({ connectionString });
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -52,6 +82,7 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    adapter,
     log:
       process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
@@ -72,13 +103,23 @@ export async function disconnectDatabase(): Promise<void> {
 `;
     }
     return `import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "${clientImport}";
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not defined");
+}
+
+const adapter = new PrismaPg({ connectionString });
 
 const globalForPrisma = globalThis;
 
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    adapter,
     log:
       process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
@@ -221,21 +262,45 @@ export async function configureDatabase(config, projectDir) {
     }
     packageJson.dependencies ??= {};
     packageJson.scripts ??= {};
-    packageJson.dependencies.dotenv ??= "latest";
     if (config.database === "postgres") {
-        packageJson.dependencies["@prisma/client"] ??= "latest";
+        packageJson.dependencies["@prisma/client"] = "^7.0.0";
+        packageJson.dependencies["@prisma/adapter-pg"] = "^7.0.0";
+        packageJson.dependencies.pg = "^8.16.3";
+        packageJson.dependencies.dotenv = "^16.4.7";
         packageJson.devDependencies ??= {};
-        packageJson.devDependencies.prisma ??= "latest";
+        packageJson.devDependencies.prisma = "^7.0.0";
+        if (config.typeScript) {
+            packageJson.devDependencies["@types/pg"] ??= "^8.16.0";
+        }
         packageJson.scripts["db:generate"] ??= "prisma generate";
         packageJson.scripts["db:migrate"] ??= "prisma migrate dev";
         packageJson.scripts["db:deploy"] ??= "prisma migrate deploy";
         packageJson.scripts["db:studio"] ??= "prisma studio";
-        await addEnvironmentVariable(path.join(projectDir, ".env.example"), "DATABASE_URL", "postgresql://postgres:password@localhost:5432/mydb?schema=public");
+        await addEnvironmentVariable(path.join(projectDir, ".env.example"), "DATABASE_URL", '"postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public"');
         const prismaDirectory = path.join(projectDir, "prisma");
         await fs.mkdir(prismaDirectory, { recursive: true });
         await writeFileIfMissing(path.join(prismaDirectory, "schema.prisma"), getPrismaSchema());
+        await writeFileIfMissing(path.join(projectDir, "prisma.config.ts"), getPrismaConfig());
+        if (config.typeScript) {
+            const tsconfigPath = path.join(projectDir, "tsconfig.json");
+            if (await pathExists(tsconfigPath)) {
+                try {
+                    const tsconfig = JSON.parse(await fs.readFile(tsconfigPath, "utf8"));
+                    if (tsconfig.compilerOptions?.rootDir && !tsconfig.include) {
+                        tsconfig.exclude = Array.isArray(tsconfig.exclude)
+                            ? [...new Set([...tsconfig.exclude, "prisma.config.ts"])]
+                            : ["node_modules", "prisma.config.ts"];
+                        await fs.writeFile(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
+                    }
+                }
+                catch {
+                    // ignore parsing error
+                }
+            }
+        }
     }
     else if (config.database === "mongodb") {
+        packageJson.dependencies.dotenv ??= "^16.4.7";
         packageJson.dependencies.mongoose ??= "latest";
         await addEnvironmentVariable(path.join(projectDir, ".env.example"), "MONGODB_URI", "mongodb://127.0.0.1:27017/mydb");
     }
@@ -252,11 +317,16 @@ export async function configureDatabase(config, projectDir) {
     await fs.mkdir(databaseDirectory, { recursive: true });
     const extension = config.typeScript ? "ts" : "js";
     const databaseFile = path.join(databaseDirectory, `db.${extension}`);
-    const databaseSource = config.database === "postgres"
-        ? getPrismaSource(config.typeScript)
-        : getMongooseSource(config.typeScript);
+    let databaseSource;
+    if (config.database === "postgres") {
+        const clientImport = calculatePrismaClientImport(databaseFile, projectDir);
+        databaseSource = getPrismaSource(config.typeScript, clientImport);
+    }
+    else {
+        databaseSource = getMongooseSource(config.typeScript);
+    }
     await writeFileIfMissing(databaseFile, databaseSource);
-    await addGitignoreRules(projectDir);
+    await addGitignoreRules(projectDir, config.database === "postgres" ? ["src/generated"] : []);
     await fs.writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
 }
 //# sourceMappingURL=database.js.map

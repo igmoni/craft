@@ -6,7 +6,13 @@ import { describe, it } from "node:test";
 
 import { configureAuth } from "../dist/generators/auth.js";
 import { expressGenerator } from "../dist/generators/backend/express.js";
-import { configureDatabase } from "../dist/generators/database.js";
+import {
+  calculatePrismaClientImport,
+  configureDatabase,
+  getPrismaConfig,
+  getPrismaSchema,
+  getPrismaSource,
+} from "../dist/generators/database.js";
 import { generateEnvFile } from "../dist/generators/env.js";
 import { configureTailwind } from "../dist/generators/tailwind.js";
 import { configureTools } from "../dist/generators/tools.js";
@@ -167,7 +173,7 @@ describe("Integrations & File Operations", () => {
   });
 
   describe("Database Integration", () => {
-    it("should configure PostgreSQL with Prisma in TypeScript", async () => {
+    it("should configure PostgreSQL with Prisma 7 in TypeScript", async () => {
       const dir = await createTempDir();
       await fs.writeFile(path.join(dir, "package.json"), "{}");
 
@@ -187,26 +193,71 @@ describe("Integrations & File Operations", () => {
       const pkg = JSON.parse(
         await fs.readFile(path.join(dir, "package.json"), "utf8")
       );
-      assert.ok(pkg.dependencies["@prisma/client"]);
-      assert.ok(pkg.devDependencies["prisma"]);
+      // Dependencies
+      assert.equal(pkg.dependencies["@prisma/client"], "^7.0.0");
+      assert.equal(pkg.dependencies["@prisma/adapter-pg"], "^7.0.0");
+      assert.equal(pkg.dependencies["pg"], "^8.16.3");
+      assert.equal(pkg.dependencies["dotenv"], "^16.4.7");
+      assert.equal(pkg.devDependencies["prisma"], "^7.0.0");
+      assert.equal(pkg.devDependencies["@types/pg"], "^8.16.0");
       assert.equal(pkg.scripts["db:generate"], "prisma generate");
+      assert.equal(pkg.scripts["db:migrate"], "prisma migrate dev");
 
+      // Prisma schema
       const schemaPath = path.join(dir, "prisma", "schema.prisma");
       assert.ok(await pathExists(schemaPath));
       const schema = await fs.readFile(schemaPath, "utf8");
+      assert.ok(schema.includes('provider = "prisma-client"'));
+      assert.ok(schema.includes('output   = "../src/generated/prisma"'));
       assert.ok(schema.includes('provider = "postgresql"'));
-      assert.ok(schema.includes('url      = env("DATABASE_URL")'));
+      assert.ok(!schema.includes("url"));
+      assert.ok(!schema.includes("prisma-client-js"));
 
+      // Prisma config
+      const configPath = path.join(dir, "prisma.config.ts");
+      assert.ok(await pathExists(configPath));
+      const configSource = await fs.readFile(configPath, "utf8");
+      assert.ok(configSource.includes('import "dotenv/config";'));
+      assert.ok(
+        configSource.includes(
+          'import { defineConfig, env } from "prisma/config";'
+        )
+      );
+      assert.ok(configSource.includes('url: env("DATABASE_URL")'));
+
+      // Database client
       const dbFile = path.join(dir, "src", "db.ts");
       assert.ok(await pathExists(dbFile));
       const dbContent = await fs.readFile(dbFile, "utf8");
+      assert.ok(
+        dbContent.includes('import { PrismaPg } from "@prisma/adapter-pg";')
+      );
+      assert.ok(
+        dbContent.includes(
+          'import { PrismaClient } from "./generated/prisma/client";'
+        )
+      );
+      assert.ok(dbContent.includes("new PrismaPg({ connectionString })"));
       assert.ok(dbContent.includes("new PrismaClient"));
+      assert.ok(
+        dbContent.includes('throw new Error("DATABASE_URL is not defined");')
+      );
+      assert.ok(dbContent.includes("globalForPrisma"));
 
+      // .env.example
       const envExample = await fs.readFile(
         path.join(dir, ".env.example"),
         "utf8"
       );
-      assert.ok(envExample.includes("DATABASE_URL="));
+      assert.ok(
+        envExample.includes(
+          'DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public"'
+        )
+      );
+
+      // .gitignore
+      const gitignore = await fs.readFile(path.join(dir, ".gitignore"), "utf8");
+      assert.ok(gitignore.includes("src/generated"));
 
       await fs.rm(dir, { recursive: true, force: true });
     });
@@ -233,11 +284,167 @@ describe("Integrations & File Operations", () => {
       const dbContent = await fs.readFile(dbFile, "utf8");
       assert.ok(!dbContent.includes(": Promise<void>"));
       assert.ok(!dbContent.includes("as unknown as"));
+      assert.ok(!dbContent.includes(": PrismaClient"));
+      assert.ok(
+        dbContent.includes('import { PrismaPg } from "@prisma/adapter-pg";')
+      );
+      assert.ok(
+        dbContent.includes('throw new Error("DATABASE_URL is not defined");')
+      );
 
       await fs.rm(dir, { recursive: true, force: true });
     });
 
-    it("should configure MongoDB with Mongoose", async () => {
+    it("should calculate correct relative client imports across framework directory layouts", () => {
+      const projectDir = path.resolve("/workspace/project");
+
+      // Express, Fastify, Hono, NestJS: src/db.ts
+      const expressDb = path.join(projectDir, "src", "db.ts");
+      assert.equal(
+        calculatePrismaClientImport(expressDb, projectDir),
+        "./generated/prisma/client"
+      );
+
+      // Next.js with src directory: src/lib/db.ts
+      const nextSrcDb = path.join(projectDir, "src", "lib", "db.ts");
+      assert.equal(
+        calculatePrismaClientImport(nextSrcDb, projectDir),
+        "../generated/prisma/client"
+      );
+
+      // Next.js without src directory: lib/db.ts
+      const nextNoSrcDb = path.join(projectDir, "lib", "db.ts");
+      assert.equal(
+        calculatePrismaClientImport(nextNoSrcDb, projectDir),
+        "../src/generated/prisma/client"
+      );
+
+      // Root level: db.ts
+      const rootDb = path.join(projectDir, "db.ts");
+      assert.equal(
+        calculatePrismaClientImport(rootDb, projectDir),
+        "./src/generated/prisma/client"
+      );
+    });
+
+    it("should configure Next.js with src/lib/db.ts and global singleton caching", async () => {
+      const dir = await createTempDir();
+      await fs.writeFile(path.join(dir, "package.json"), "{}");
+      await fs.mkdir(path.join(dir, "src"), { recursive: true });
+
+      await configureDatabase(
+        {
+          projectName: "next-db-app",
+          framework: "next",
+          typeScript: true,
+          database: "postgres",
+          auth: false,
+          tools: [],
+          packageManager: "npm",
+        },
+        dir
+      );
+
+      const dbFile = path.join(dir, "src", "lib", "db.ts");
+      assert.ok(await pathExists(dbFile));
+      const content = await fs.readFile(dbFile, "utf8");
+      assert.ok(
+        content.includes(
+          'import { PrismaClient } from "../generated/prisma/client";'
+        )
+      );
+      assert.ok(content.includes("globalForPrisma.prisma = prisma;"));
+
+      await fs.rm(dir, { recursive: true, force: true });
+    });
+
+    it("should adjust tsconfig.json to exclude prisma.config.ts when rootDir is set", async () => {
+      const dir = await createTempDir();
+      await fs.writeFile(path.join(dir, "package.json"), "{}");
+      await fs.writeFile(
+        path.join(dir, "tsconfig.json"),
+        JSON.stringify({
+          compilerOptions: {
+            rootDir: "./src",
+            outDir: "./dist",
+          },
+        })
+      );
+
+      await configureDatabase(
+        {
+          projectName: "fastify-app",
+          framework: "fastify",
+          typeScript: true,
+          database: "postgres",
+          auth: false,
+          tools: [],
+          packageManager: "npm",
+        },
+        dir
+      );
+
+      const tsconfig = JSON.parse(
+        await fs.readFile(path.join(dir, "tsconfig.json"), "utf8")
+      );
+      assert.ok(Array.isArray(tsconfig.exclude));
+      assert.ok(tsconfig.exclude.includes("prisma.config.ts"));
+
+      await fs.rm(dir, { recursive: true, force: true });
+    });
+
+    it("should preserve existing user files without overwriting", async () => {
+      const dir = await createTempDir();
+      await fs.writeFile(path.join(dir, "package.json"), "{}");
+
+      // Pre-existing schema with custom models
+      const prismaDir = path.join(dir, "prisma");
+      await fs.mkdir(prismaDir, { recursive: true });
+      await fs.writeFile(
+        path.join(prismaDir, "schema.prisma"),
+        "// Custom user schema"
+      );
+
+      // Pre-existing prisma.config.ts
+      await fs.writeFile(
+        path.join(dir, "prisma.config.ts"),
+        "// Custom user config"
+      );
+
+      // Pre-existing db.ts
+      await fs.mkdir(path.join(dir, "src"), { recursive: true });
+      await fs.writeFile(path.join(dir, "src", "db.ts"), "// Custom user db");
+
+      await configureDatabase(
+        {
+          projectName: "preserve-app",
+          framework: "express",
+          typeScript: true,
+          database: "postgres",
+          auth: false,
+          tools: [],
+          packageManager: "npm",
+        },
+        dir
+      );
+
+      assert.equal(
+        await fs.readFile(path.join(prismaDir, "schema.prisma"), "utf8"),
+        "// Custom user schema"
+      );
+      assert.equal(
+        await fs.readFile(path.join(dir, "prisma.config.ts"), "utf8"),
+        "// Custom user config"
+      );
+      assert.equal(
+        await fs.readFile(path.join(dir, "src", "db.ts"), "utf8"),
+        "// Custom user db"
+      );
+
+      await fs.rm(dir, { recursive: true, force: true });
+    });
+
+    it("should configure MongoDB with Mongoose without Prisma artifacts", async () => {
       const dir = await createTempDir();
       await fs.writeFile(path.join(dir, "package.json"), "{}");
 
@@ -257,18 +464,20 @@ describe("Integrations & File Operations", () => {
       const pkg = JSON.parse(
         await fs.readFile(path.join(dir, "package.json"), "utf8")
       );
-      assert.ok(pkg.dependencies["mongoose"]);
+      assert.ok(pkg.dependencies.mongoose);
+      assert.equal(pkg.dependencies["@prisma/client"], undefined);
+      assert.equal(pkg.dependencies["@prisma/adapter-pg"], undefined);
+      assert.equal(pkg.dependencies["pg"], undefined);
+      assert.equal(pkg.devDependencies?.prisma, undefined);
+
+      assert.ok(!(await pathExists(path.join(dir, "prisma"))));
+      assert.ok(!(await pathExists(path.join(dir, "prisma.config.ts"))));
 
       const dbFile = path.join(dir, "src", "db.ts");
       assert.ok(await pathExists(dbFile));
       const dbContent = await fs.readFile(dbFile, "utf8");
-      assert.ok(dbContent.includes("mongoose.connect"));
-
-      const envExample = await fs.readFile(
-        path.join(dir, ".env.example"),
-        "utf8"
-      );
-      assert.ok(envExample.includes("MONGODB_URI="));
+      assert.ok(dbContent.includes("mongoose"));
+      assert.ok(!dbContent.includes("PrismaClient"));
 
       await fs.rm(dir, { recursive: true, force: true });
     });

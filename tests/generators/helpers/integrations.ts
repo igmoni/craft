@@ -46,11 +46,38 @@ export async function verifyPrismaIntegration(
     failures.push("prisma/schema.prisma missing");
   } else {
     const schemaContent = (await readFileSafe(schemaPath)) || "";
-    if (!schemaContent.includes('provider = "prisma-client-js"')) {
-      failures.push("schema.prisma missing prisma-client-js generator");
+    if (!schemaContent.includes('provider = "prisma-client"')) {
+      failures.push('schema.prisma missing "prisma-client" generator');
+    }
+    if (schemaContent.includes('provider = "prisma-client-js"')) {
+      failures.push(
+        'schema.prisma should not use deprecated "prisma-client-js"'
+      );
+    }
+    if (!schemaContent.includes('output   = "../src/generated/prisma"')) {
+      failures.push('schema.prisma missing "../src/generated/prisma" output');
     }
     if (!schemaContent.includes('provider = "postgresql"')) {
       failures.push("schema.prisma missing postgresql datasource provider");
+    }
+    if (schemaContent.includes("url")) {
+      failures.push(
+        "schema.prisma should not contain url inside datasource block in Prisma 7"
+      );
+    }
+  }
+
+  // Check root-level prisma.config.ts
+  const configPath = path.join(projectDir, "prisma.config.ts");
+  if (!(await pathExists(configPath))) {
+    failures.push("prisma.config.ts missing");
+  } else {
+    const configContent = (await readFileSafe(configPath)) || "";
+    if (!configContent.includes("defineConfig")) {
+      failures.push('prisma.config.ts missing "defineConfig"');
+    }
+    if (!configContent.includes('env("DATABASE_URL")')) {
+      failures.push('prisma.config.ts missing env("DATABASE_URL")');
     }
   }
 
@@ -62,12 +89,22 @@ export async function verifyPrismaIntegration(
     path.join(projectDir, "lib", "db.ts"),
   ];
 
-  const hasClient = (
-    await Promise.all(clientCandidates.map((p) => pathExists(p)))
-  ).some(Boolean);
+  const existingClient = (
+    await Promise.all(
+      clientCandidates.map(async (p) => ((await pathExists(p)) ? p : null))
+    )
+  ).find(Boolean);
 
-  if (!hasClient) {
+  if (!existingClient) {
     failures.push("Database client file (db.ts/db.js) missing");
+  } else {
+    const clientContent = (await readFileSafe(existingClient)) || "";
+    if (!clientContent.includes("PrismaPg")) {
+      failures.push("Database client missing PrismaPg adapter");
+    }
+    if (!clientContent.includes("DATABASE_URL")) {
+      failures.push("Database client missing DATABASE_URL validation");
+    }
   }
 
   // Check package.json scripts and dependencies
@@ -81,6 +118,12 @@ export async function verifyPrismaIntegration(
     const devDeps = pkg.devDependencies || {};
     if (!deps["@prisma/client"]) {
       failures.push('package.json missing "@prisma/client" dependency');
+    }
+    if (!deps["@prisma/adapter-pg"]) {
+      failures.push('package.json missing "@prisma/adapter-pg" dependency');
+    }
+    if (!deps.pg) {
+      failures.push('package.json missing "pg" dependency');
     }
     if (!devDeps.prisma && !deps.prisma) {
       failures.push('package.json missing "prisma" devDependency');
@@ -100,7 +143,8 @@ export async function verifyPrismaIntegration(
   return {
     name: "Prisma (PostgreSQL)",
     status: "passed",
-    message: "Schema, client, environment variables, and scripts verified",
+    message:
+      "Schema, config, client, adapter, environment variables, and scripts verified",
   };
 }
 
